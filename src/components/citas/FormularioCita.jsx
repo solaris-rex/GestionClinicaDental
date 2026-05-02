@@ -43,16 +43,21 @@ export default function FormularioCita({ citaInicial, onGuardar, onCancelar }) {
   }
 
   async function handleBusquedaPaciente(e) {
-    const termino = e.target.value
-    setBusquedaPaciente(termino)
-    if (termino.trim() === '') {
-      const { data } = await obtenerPacientes()
-      setPacientes(data || [])
-    } else {
-      const { data } = await buscarPacientes(termino)
-      setPacientes(data || [])
-    }
+  const termino = e.target.value
+  setBusquedaPaciente(termino)
+
+  // Limpiar paciente seleccionado si el usuario está escribiendo de nuevo
+  setForm(prev => ({ ...prev, paciente_id: '' }))
+
+  // Solo buscar si hay al menos 1 carácter
+  if (termino.trim() === '') {
+    setPacientes([]) // limpiar lista cuando está vacío
+    return
   }
+
+  const { data } = await buscarPacientes(termino)
+  setPacientes(data || [])
+}
 
   // Verificar disponibilidad cuando cambian odontólogo, fecha u hora
   async function verificar(nuevoForm) {
@@ -120,33 +125,57 @@ export default function FormularioCita({ citaInicial, onGuardar, onCancelar }) {
         </div>
       )}
 
-      {/* Buscar paciente */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Buscar paciente
-        </label>
-        <input
-          type="text"
-          value={busquedaPaciente}
-          onChange={handleBusquedaPaciente}
-          placeholder="Buscar por nombre o DNI..."
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 mb-2"
-        />
-        <select
-          name="paciente_id"
-          value={form.paciente_id}
-          onChange={handleChange}
-          required
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-        >
-          <option value="">Seleccione un paciente</option>
-          {pacientes.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.apellido}, {p.nombre} — DNI: {p.dni}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Buscar y seleccionar paciente - versión mejorada */}
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Paciente <span className="text-red-500">*</span>
+  </label>
+  <input
+    type="text"
+    value={busquedaPaciente}
+    onChange={handleBusquedaPaciente}
+    placeholder="🔍 Buscar paciente por nombre o DNI..."
+    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+  />
+
+  {/* Lista de resultados — solo aparece cuando hay texto */}
+  {busquedaPaciente.trim() !== '' && (
+    <div className="border border-gray-200 rounded-lg mt-1 max-h-40 overflow-y-auto shadow-sm bg-white">
+      {pacientes.length === 0 ? (
+        <p className="text-sm text-gray-400 px-3 py-2">
+          No se encontraron pacientes
+        </p>
+      ) : (
+        pacientes.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => {
+              setForm({ ...form, paciente_id: p.id })
+              setBusquedaPaciente(`${p.apellido}, ${p.nombre} — DNI: ${p.dni}`)
+            }}
+            className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 border-b border-gray-100 last:border-0"
+          >
+            <span className="font-medium text-gray-800">
+              {p.apellido}, {p.nombre}
+            </span>
+            <span className="text-gray-400 ml-2">DNI: {p.dni}</span>
+          </button>
+        ))
+      )}
+    </div>
+  )}
+
+  {/* Paciente seleccionado */}
+  {form.paciente_id && busquedaPaciente.trim() !== '' && (
+    <p className="text-xs text-green-600 mt-1 font-medium">
+      ✅ Paciente seleccionado
+    </p>
+  )}
+
+  {/* Input oculto para validación del formulario */}
+  <input type="hidden" name="paciente_id" value={form.paciente_id} required />
+</div>
 
       {/* Odontólogo */}
       <div>
