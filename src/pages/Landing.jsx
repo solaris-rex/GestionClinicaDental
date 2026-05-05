@@ -1,14 +1,14 @@
 // src/pages/Landing.jsx
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import Sidebar from '../components/layout/Sidebar'
 
 export default function Landing() {
   const navigate = useNavigate()
   const { usuario, perfil, cerrarSesion, cargando } = useAuth()
 
-  // Función para manejar reserva de cita
   function handleReservar() {
-    if (cargando) return // esperar a que cargue
+    if (cargando) return
     if (usuario && perfil) {
       navigate('/paciente')
     } else {
@@ -19,44 +19,52 @@ export default function Landing() {
   return (
     <div className="min-h-screen font-sans">
 
-      {/* ===== NAVBAR ===== */}
-      <nav className="bg-white shadow-sm sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+      {/* Sidebar colapsable */}
+      <Sidebar rol="publico" />
 
-          {/* Logo */}
-          <div className="flex items-center gap-2">
+      {/* ===== NAVBAR ===== */}
+      <nav className="bg-white shadow-sm sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-6 py-3 flex justify-between items-center">
+
+          {/* Logo con margen para hamburguesa */}
+          <div className="flex items-center gap-2 ml-12">
             <span className="text-2xl">🦷</span>
             <span className="text-xl font-bold text-teal-700">DentaNovax</span>
           </div>
 
-          {/* Links de navegación */}
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
-            <a href="#inicio" className="hover:text-teal-600 transition">Inicio</a>
-            <a href="#servicios" className="hover:text-teal-600 transition">Servicios</a>
-            <a href="#nosotros" className="hover:text-teal-600 transition">Nosotros</a>
-            <a href="#contacto" className="hover:text-teal-600 transition">Contacto</a>
-          </div>
-
-          {/* Botón login / usuario */}
+          {/* Saludo o botón login */}
           <div className="flex items-center gap-3">
             {cargando ? (
-              // Mientras carga mostrar placeholder
-              <div className="w-32 h-9 bg-gray-100 rounded-lg animate-pulse" />
+              <div className="w-48 h-10 bg-gray-100 rounded-lg animate-pulse" />
             ) : usuario && perfil ? (
-              <>
-                <button
-                  onClick={() => navigate('/paciente')}
-                  className="text-sm font-medium text-teal-700 hover:underline flex items-center gap-1"
-                >
-                  👤 {perfil.nombre} {perfil.apellido}
-                </button>
-                <button
-                  onClick={cerrarSesion}
-                  className="bg-red-500 hover:bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
-                >
-                  Cerrar sesión
-                </button>
-              </>
+              <div className="flex items-center gap-3">
+                {/* Foto de perfil */}
+                {perfil.avatar_url ? (
+                  <img
+                    src={perfil.avatar_url}
+                    alt="Avatar"
+                    className="w-9 h-9 rounded-full object-cover border-2 border-teal-500"
+                  />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-teal-600 flex items-center justify-center text-white font-bold text-sm">
+                    {perfil.nombre?.charAt(0)}{perfil.apellido?.charAt(0)}
+                  </div>
+                )}
+                {/* Saludo con fecha */}
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-gray-800">
+                    ¡Hola, {perfil.nombre}! 👋
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {new Date().toLocaleDateString('es-PE', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </p>
+                </div>
+              </div>
             ) : (
               <button
                 onClick={() => navigate('/login')}
@@ -274,10 +282,7 @@ export default function Landing() {
               <li><a href="#nosotros" className="hover:text-teal-400 transition">Nosotros</a></li>
               <li><a href="#contacto" className="hover:text-teal-400 transition">Contacto</a></li>
               <li>
-                <button
-                  onClick={() => navigate('/login')}
-                  className="hover:text-teal-400 transition"
-                >
+                <button onClick={() => navigate('/login')} className="hover:text-teal-400 transition">
                   Iniciar sesión
                 </button>
               </li>

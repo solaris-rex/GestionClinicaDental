@@ -12,6 +12,7 @@ import PanelOdontologo from './pages/odontologo/PanelOdontologo'
 import PanelPaciente from './pages/paciente/PanelPaciente'
 import GestionPacientes from './pages/recepcionista/GestionPacientes'
 import GestionCitas from './pages/recepcionista/GestionCitas'
+import EditarPerfil from './pages/perfil/EditarPerfil'
 
 // Pantalla de acceso denegado
 function AccesoDenegado() {
@@ -119,6 +120,13 @@ function AppRoutes() {
       <Route path="/paciente" element={
         <RutaProtegida rolesPermitidos={['paciente', 'administrador']}>
           <PanelPaciente />
+        </RutaProtegida>
+      } />
+
+      // Agrega la ruta protegida
+      <Route path="/perfil" element={
+        <RutaProtegida>
+          <EditarPerfil />
         </RutaProtegida>
       } />
 

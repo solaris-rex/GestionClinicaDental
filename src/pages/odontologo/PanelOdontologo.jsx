@@ -1,10 +1,7 @@
 // src/pages/odontologo/PanelOdontologo.jsx
-// Panel principal del odontólogo.
-// Muestra su agenda del día y sus próximas citas.
-
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Navbar from '../../components/layout/Navbar'
+import Sidebar from '../../components/layout/Sidebar'
 import { useAuth } from '../../context/AuthContext'
 import { obtenerCitasPorOdontologo } from '../../services/citasService'
 
@@ -20,7 +17,7 @@ export default function PanelOdontologo() {
   const navigate = useNavigate()
   const [citas, setCitas] = useState([])
   const [cargando, setCargando] = useState(true)
-  const [vistaActiva, setVistaActiva] = useState('hoy') // 'hoy' | 'proximas'
+  const [vistaActiva, setVistaActiva] = useState('hoy')
 
   useEffect(() => {
     if (perfil?.id) cargarCitas()
@@ -33,15 +30,12 @@ export default function PanelOdontologo() {
     setCargando(false)
   }
 
-  // Fecha de hoy en formato YYYY-MM-DD
   const hoy = new Date().toISOString().split('T')[0]
 
-  // Citas de hoy
   const citasHoy = citas.filter(
     (c) => c.fecha === hoy && c.estado !== 'cancelada'
   )
 
-  // Próximas citas (desde mañana en adelante)
   const citasProximas = citas.filter(
     (c) => c.fecha > hoy && c.estado !== 'cancelada'
   )
@@ -56,7 +50,6 @@ export default function PanelOdontologo() {
     return hora?.slice(0, 5) || '—'
   }
 
-  // Obtener el día de la semana en español
   function obtenerDiaSemana(fecha) {
     const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
     const d = new Date(fecha + 'T00:00:00')
@@ -64,12 +57,15 @@ export default function PanelOdontologo() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Navbar />
+    <div className="min-h-screen bg-gray-100 flex">
 
-      <div className="max-w-5xl mx-auto px-4 py-8">
+      {/* Sidebar */}
+      <Sidebar rol="odontologo" />
 
-        {/* Encabezado con saludo */}
+      {/* Contenido */}
+      <div className="flex-1 px-4 py-8 pt-16 md:pt-8 md:ml-64">
+
+        {/* Encabezado */}
         <div className="bg-blue-700 text-white rounded-2xl p-6 mb-6 shadow">
           <h2 className="text-2xl font-bold">
             👨‍⚕️ Bienvenido, Dr. {perfil?.nombre} {perfil?.apellido}
@@ -79,7 +75,7 @@ export default function PanelOdontologo() {
           </p>
         </div>
 
-        {/* Tarjetas resumen */}
+        {/* Resumen */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-xl shadow p-4 text-center">
             <p className="text-3xl font-bold text-blue-700">{citasHoy.length}</p>
@@ -97,7 +93,7 @@ export default function PanelOdontologo() {
           </div>
         </div>
 
-        {/* Pestañas de navegación */}
+        {/* Tabs */}
         <div className="flex gap-2 mb-4">
           <button
             onClick={() => setVistaActiva('hoy')}
@@ -109,6 +105,7 @@ export default function PanelOdontologo() {
           >
             📅 Agenda de hoy
           </button>
+
           <button
             onClick={() => setVistaActiva('proximas')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
@@ -121,7 +118,7 @@ export default function PanelOdontologo() {
           </button>
         </div>
 
-        {/* Vista: Agenda de hoy */}
+        {/* Hoy */}
         {vistaActiva === 'hoy' && (
           <div className="bg-white rounded-2xl shadow overflow-hidden">
             <div className="px-6 py-4 border-b bg-gray-50">
@@ -148,17 +145,14 @@ export default function PanelOdontologo() {
                       key={cita.id}
                       className="px-6 py-4 flex items-center justify-between hover:bg-gray-50"
                     >
-                      {/* Hora */}
                       <div className="w-16 text-center">
                         <span className="text-lg font-bold text-blue-700">
                           {formatearHora(cita.hora)}
                         </span>
                       </div>
 
-                      {/* Línea separadora vertical */}
                       <div className="w-px h-12 bg-gray-200 mx-4" />
 
-                      {/* Datos del paciente */}
                       <div className="flex-1">
                         <p className="font-semibold text-gray-800">
                           {cita.paciente?.apellido}, {cita.paciente?.nombre}
@@ -173,7 +167,6 @@ export default function PanelOdontologo() {
                         )}
                       </div>
 
-                      {/* Estado */}
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${COLORES_ESTADO[cita.estado]}`}>
                         {cita.estado}
                       </span>
@@ -184,7 +177,7 @@ export default function PanelOdontologo() {
           </div>
         )}
 
-        {/* Vista: Próximas citas */}
+        {/* Próximas */}
         {vistaActiva === 'proximas' && (
           <div className="bg-white rounded-2xl shadow overflow-hidden">
             <div className="px-6 py-4 border-b bg-gray-50">

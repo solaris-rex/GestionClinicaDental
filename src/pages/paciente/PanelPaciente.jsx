@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
+import Sidebar from '../../components/layout/Sidebar'
 import { obtenerOdontologos, crearCita, verificarDisponibilidad } from '../../services/citasService'
 
 const COLORES_ESTADO = {
@@ -19,7 +20,7 @@ const HORAS_DISPONIBLES = [
 ]
 
 export default function PanelPaciente() {
-  const { perfil, cerrarSesion } = useAuth()
+  const { perfil } = useAuth()
   const navigate = useNavigate()
   const [citas, setCitas] = useState([])
   const [odontologos, setOdontologos] = useState([])
@@ -46,7 +47,6 @@ export default function PanelPaciente() {
     setCargando(true)
     const { data: authData } = await supabase.auth.getUser()
     const emailUsuario = authData?.user?.email
-
     if (!emailUsuario) { setCargando(false); return }
 
     const { data: perfilData } = await supabase
@@ -150,31 +150,41 @@ export default function PanelPaciente() {
   return (
     <div className="min-h-screen bg-gray-50">
 
+      {/* Sidebar */}
+      <Sidebar rol="paciente" />
+
       {/* ===== NAVBAR ===== */}
-      <nav className="bg-white shadow-sm sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-          <button onClick={() => navigate('/')} className="flex items-center gap-2">
+      <nav className="bg-white shadow-sm sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-6 py-3 flex justify-between items-center">
+          <div className="flex items-center gap-2 ml-12">
             <span className="text-2xl">🦷</span>
             <span className="text-xl font-bold text-teal-700">DentaNovax</span>
-          </button>
-          <div className="flex items-center gap-4">
+          </div>
+          <div className="flex items-center gap-3">
+            {perfil?.avatar_url ? (
+              <img src={perfil.avatar_url} alt="Avatar"
+                className="w-9 h-9 rounded-full object-cover border-2 border-teal-500" />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-teal-600 flex items-center justify-center text-white font-bold text-sm">
+                {perfil?.nombre?.charAt(0)}{perfil?.apellido?.charAt(0)}
+              </div>
+            )}
             <div className="text-right">
               <p className="text-sm font-semibold text-gray-800">
-                {perfil?.nombre} {perfil?.apellido}
+                ¡Hola, {perfil?.nombre}! 👋
               </p>
-              <p className="text-xs text-teal-600">Paciente</p>
+              <p className="text-xs text-gray-400">
+                {new Date().toLocaleDateString('es-PE', {
+                  weekday: 'long', year: 'numeric',
+                  month: 'long', day: 'numeric'
+                })}
+              </p>
             </div>
-            <button
-              onClick={cerrarSesion}
-              className="bg-red-500 hover:bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
-            >
-              Cerrar sesión
-            </button>
           </div>
         </div>
       </nav>
 
-      {/* ===== HERO DEL PANEL ===== */}
+      {/* ===== HERO ===== */}
       <div className="bg-gradient-to-r from-teal-600 to-teal-700 text-white py-10 px-6">
         <div className="max-w-6xl mx-auto">
           <h1 className="text-3xl font-bold mb-1">
@@ -203,8 +213,10 @@ export default function PanelPaciente() {
             <p className="text-4xl font-bold text-gray-600">{citasPasadas.length}</p>
             <p className="text-gray-500 mt-1 text-sm">Citas anteriores</p>
           </div>
-          <div className="bg-teal-600 rounded-2xl shadow-sm p-6 text-center cursor-pointer hover:bg-teal-700 transition"
-            onClick={() => { setVista('nueva'); setError('') }}>
+          <div
+            className="bg-teal-600 rounded-2xl shadow-sm p-6 text-center cursor-pointer hover:bg-teal-700 transition"
+            onClick={() => { setVista('nueva'); setError('') }}
+          >
             <p className="text-4xl mb-1">📅</p>
             <p className="text-white font-semibold">+ Solicitar nueva cita</p>
           </div>
@@ -284,7 +296,9 @@ export default function PanelPaciente() {
 
               {disponibilidad !== null && (
                 <div className={`px-4 py-3 rounded-xl text-sm font-medium ${
-                  disponibilidad ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
+                  disponibilidad
+                    ? 'bg-green-50 border border-green-200 text-green-700'
+                    : 'bg-red-50 border border-red-200 text-red-700'
                 }`}>
                   {disponibilidad ? '✅ Horario disponible' : '❌ Horario ocupado — elige otro'}
                 </div>
@@ -330,7 +344,7 @@ export default function PanelPaciente() {
                 <p className="text-5xl mb-4">📭</p>
                 <p className="text-gray-600 font-medium">No tienes citas registradas aún</p>
                 <p className="text-sm text-gray-400 mt-2 mb-6">
-                  Solicita tu primera cita haciendo clic en el botón de arriba
+                  Solicita tu primera cita haciendo clic arriba
                 </p>
                 <button
                   onClick={() => { setVista('nueva'); setError('') }}
@@ -345,7 +359,6 @@ export default function PanelPaciente() {
                   <div key={cita.id} className="px-6 py-5 hover:bg-gray-50 transition">
                     <div className="flex justify-between items-start">
                       <div className="flex gap-4 items-start">
-                        {/* Fecha destacada */}
                         <div className="bg-teal-50 rounded-xl p-3 text-center min-w-16">
                           <p className="text-xs text-teal-600 font-medium">
                             {obtenerDiaSemana(cita.fecha).slice(0, 3).toUpperCase()}
@@ -357,7 +370,6 @@ export default function PanelPaciente() {
                             {['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(cita.fecha?.split('-')[1]) - 1]}
                           </p>
                         </div>
-                        {/* Info */}
                         <div>
                           <p className="font-semibold text-gray-800">
                             🕐 {cita.hora?.slice(0, 5)} hrs
@@ -366,9 +378,7 @@ export default function PanelPaciente() {
                             Dr. {cita.odontologo?.nombre} {cita.odontologo?.apellido}
                           </p>
                           {cita.motivo && (
-                            <p className="text-sm text-gray-400 mt-1">
-                              📋 {cita.motivo}
-                            </p>
+                            <p className="text-sm text-gray-400 mt-1">📋 {cita.motivo}</p>
                           )}
                         </div>
                       </div>
@@ -382,7 +392,6 @@ export default function PanelPaciente() {
             )}
           </div>
         )}
-
       </div>
 
       {/* Footer */}
@@ -395,7 +404,6 @@ export default function PanelPaciente() {
           <p>© 2026 DentaNovax. Todos los derechos reservados.</p>
         </div>
       </footer>
-
     </div>
   )
 }

@@ -53,3 +53,13 @@ export async function obtenerPacientePorId(id) {
     .single()
   return { data, error }
 }
+
+// Obtener paciente por email (para vincular con el usuario logueado)
+export async function obtenerPacientePorEmail(email) {
+  const { data, error } = await supabase
+    .from('pacientes')
+    .select('*')
+    .eq('email', email)
+    .single()
+  return { data, error }
+}

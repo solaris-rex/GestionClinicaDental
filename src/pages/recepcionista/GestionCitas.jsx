@@ -1,8 +1,6 @@
 // src/pages/recepcionista/GestionCitas.jsx
-// Página principal de gestión de citas para la recepcionista.
-
 import { useEffect, useState } from 'react'
-import Navbar from '../../components/layout/Navbar'
+import Sidebar from '../../components/layout/Sidebar'
 import FormularioCita from '../../components/citas/FormularioCita'
 import {
   obtenerCitas,
@@ -63,10 +61,10 @@ export default function GestionCitas() {
     await cargarCitas()
   }
 
-  // Filtrar citas por estado
-  const citasFiltradas = filtroEstado === 'todas'
-    ? citas
-    : citas.filter((c) => c.estado === filtroEstado)
+  const citasFiltradas =
+    filtroEstado === 'todas'
+      ? citas
+      : citas.filter((c) => c.estado === filtroEstado)
 
   function formatearFecha(fecha) {
     if (!fecha) return '—'
@@ -75,14 +73,18 @@ export default function GestionCitas() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Navbar />
+    <div className="min-h-screen bg-gray-100 flex">
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      {/* Sidebar */}
+      <Sidebar rol="recepcionista" />
+
+      {/* Contenido */}
+      <div className="flex-1 px-4 py-8 pt-16 md:pt-8 md:ml-64">
 
         {/* Encabezado */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-800">📅 Gestión de Citas</h2>
+
           {vista === 'lista' && (
             <button
               onClick={() => { setCitaSeleccionada(null); setVista('nuevo') }}
@@ -93,7 +95,7 @@ export default function GestionCitas() {
           )}
         </div>
 
-        {/* Formulario nueva cita */}
+        {/* Nueva */}
         {vista === 'nuevo' && (
           <div className="bg-white rounded-2xl shadow p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
@@ -106,7 +108,7 @@ export default function GestionCitas() {
           </div>
         )}
 
-        {/* Formulario reprogramar cita */}
+        {/* Reprogramar */}
         {vista === 'reprogramar' && citaSeleccionada && (
           <div className="bg-white rounded-2xl shadow p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
@@ -126,10 +128,10 @@ export default function GestionCitas() {
           </div>
         )}
 
-        {/* Lista de citas */}
+        {/* Lista */}
         {vista === 'lista' && (
           <>
-            {/* Filtros por estado */}
+            {/* Filtros */}
             <div className="flex gap-2 mb-4 flex-wrap">
               {['todas', 'programada', 'confirmada', 'cancelada', 'completada'].map((estado) => (
                 <button
@@ -189,7 +191,7 @@ export default function GestionCitas() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex gap-1 flex-wrap">
-                            {/* Reprogramar */}
+
                             {c.estado !== 'cancelada' && c.estado !== 'completada' && (
                               <button
                                 onClick={() => { setCitaSeleccionada(c); setVista('reprogramar') }}
@@ -198,7 +200,7 @@ export default function GestionCitas() {
                                 📅 Reprogramar
                               </button>
                             )}
-                            {/* Confirmar */}
+
                             {c.estado === 'programada' && (
                               <button
                                 onClick={() => handleCambiarEstado(c.id, 'confirmada')}
@@ -207,7 +209,7 @@ export default function GestionCitas() {
                                 ✅ Confirmar
                               </button>
                             )}
-                            {/* Completar */}
+
                             {c.estado === 'confirmada' && (
                               <button
                                 onClick={() => handleCambiarEstado(c.id, 'completada')}
@@ -216,7 +218,7 @@ export default function GestionCitas() {
                                 🏁 Completar
                               </button>
                             )}
-                            {/* Cancelar */}
+
                             {c.estado !== 'cancelada' && c.estado !== 'completada' && (
                               <button
                                 onClick={() => handleCambiarEstado(c.id, 'cancelada')}
@@ -225,6 +227,7 @@ export default function GestionCitas() {
                                 ❌ Cancelar
                               </button>
                             )}
+
                           </div>
                         </td>
                       </tr>
@@ -245,6 +248,7 @@ export default function GestionCitas() {
             </p>
           </>
         )}
+
       </div>
     </div>
   )

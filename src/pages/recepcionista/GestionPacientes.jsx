@@ -1,9 +1,6 @@
 // src/pages/recepcionista/GestionPacientes.jsx
-// Página principal de gestión de pacientes.
-// Permite listar, buscar, registrar y editar pacientes.
-
 import { useEffect, useState } from 'react'
-import Navbar from '../../components/layout/Navbar'
+import Sidebar from '../../components/layout/Sidebar'
 import FormularioPaciente from '../../components/pacientes/FormularioPaciente'
 import {
   obtenerPacientes,
@@ -16,7 +13,7 @@ export default function GestionPacientes() {
   const [pacientes, setPacientes] = useState([])
   const [cargando, setCargando] = useState(true)
   const [busqueda, setBusqueda] = useState('')
-  const [vista, setVista] = useState('lista') // 'lista' | 'nuevo' | 'editar'
+  const [vista, setVista] = useState('lista')
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState(null)
 
   useEffect(() => {
@@ -33,6 +30,7 @@ export default function GestionPacientes() {
   async function handleBusqueda(e) {
     const termino = e.target.value
     setBusqueda(termino)
+
     if (termino.trim() === '') {
       cargarPacientes()
     } else {
@@ -64,7 +62,6 @@ export default function GestionPacientes() {
     setVista('editar')
   }
 
-  // Calcular edad desde fecha de nacimiento
   function calcularEdad(fechaNacimiento) {
     if (!fechaNacimiento) return '—'
     const hoy = new Date()
@@ -73,16 +70,20 @@ export default function GestionPacientes() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Navbar />
+    <div className="min-h-screen bg-gray-100 flex">
 
-      <div className="max-w-5xl mx-auto px-4 py-8">
+      {/* Sidebar */}
+      <Sidebar rol="recepcionista" />
+
+      {/* Contenido */}
+      <div className="flex-1 px-4 py-8 pt-16 md:pt-8 md:ml-64">
 
         {/* Encabezado */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-800">
             🏥 Gestión de Pacientes
           </h2>
+
           {vista === 'lista' && (
             <button
               onClick={() => setVista('nuevo')}
@@ -93,7 +94,7 @@ export default function GestionPacientes() {
           )}
         </div>
 
-        {/* Vista: Formulario nuevo paciente */}
+        {/* Nuevo */}
         {vista === 'nuevo' && (
           <div className="bg-white rounded-2xl shadow p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
@@ -106,7 +107,7 @@ export default function GestionPacientes() {
           </div>
         )}
 
-        {/* Vista: Formulario editar paciente */}
+        {/* Editar */}
         {vista === 'editar' && pacienteSeleccionado && (
           <div className="bg-white rounded-2xl shadow p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
@@ -120,10 +121,9 @@ export default function GestionPacientes() {
           </div>
         )}
 
-        {/* Vista: Lista de pacientes */}
+        {/* Lista */}
         {vista === 'lista' && (
           <>
-            {/* Buscador */}
             <div className="mb-4">
               <input
                 type="text"
@@ -134,7 +134,6 @@ export default function GestionPacientes() {
               />
             </div>
 
-            {/* Tabla de pacientes */}
             <div className="bg-white rounded-2xl shadow overflow-hidden">
               {cargando ? (
                 <p className="text-center text-gray-400 py-8">Cargando pacientes...</p>
@@ -159,9 +158,7 @@ export default function GestionPacientes() {
                           <p className="text-xs text-gray-400">{p.email || '—'}</p>
                         </td>
                         <td className="px-4 py-3 text-gray-600">{p.dni}</td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {p.telefono || '—'}
-                        </td>
+                        <td className="px-4 py-3 text-gray-600">{p.telefono || '—'}</td>
                         <td className="px-4 py-3 text-gray-600">
                           {calcularEdad(p.fecha_nacimiento)} años
                         </td>
@@ -186,12 +183,12 @@ export default function GestionPacientes() {
               )}
             </div>
 
-            {/* Contador */}
             <p className="text-sm text-gray-400 mt-3">
               Total: {pacientes.length} paciente(s)
             </p>
           </>
         )}
+
       </div>
     </div>
   )
