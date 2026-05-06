@@ -2,77 +2,49 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/layout/Sidebar'
 
 export default function PanelAdmin() {
   const navigate = useNavigate()
+  const { perfil } = useAuth()
   const [usuarios, setUsuarios] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [vista, setVista] = useState('lista')
 
   const [form, setForm] = useState({
-    nombre: '',
-    apellido: '',
-    telefono: '',
-    email: '',
-    password: '',
-    rol: 'recepcionista',
+    nombre: '', apellido: '', telefono: '', email: '', password: '', rol: 'recepcionista',
   })
   const [guardando, setGuardando] = useState(false)
   const [errorForm, setErrorForm] = useState('')
   const [exito, setExito] = useState('')
 
-  useEffect(() => {
-    cargarUsuarios()
-  }, [])
+  useEffect(() => { cargarUsuarios() }, [])
 
   async function cargarUsuarios() {
     setCargando(true)
-    const { data, error } = await supabase
-      .from('perfiles')
-      .select('*')
-      .order('created_at', { ascending: false })
-
+    const { data, error } = await supabase.from('perfiles').select('*').order('created_at', { ascending: false })
     if (error) setError('Error al cargar usuarios')
     else setUsuarios(data)
-
     setCargando(false)
   }
 
   async function cambiarRol(id, nuevoRol) {
-    const { error } = await supabase
-      .from('perfiles')
-      .update({ rol: nuevoRol })
-      .eq('id', id)
-
+    const { error } = await supabase.from('perfiles').update({ rol: nuevoRol }).eq('id', id)
     if (error) alert('Error al cambiar rol')
     else cargarUsuarios()
   }
 
-  function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value })
-  }
+  function handleChange(e) { setForm({ ...form, [e.target.name]: e.target.value }) }
 
   function validarFormulario() {
-    if (form.telefono && form.telefono.length !== 9) {
-      return 'El teléfono debe tener exactamente 9 dígitos.'
-    }
-    if (form.telefono && !/^\d+$/.test(form.telefono)) {
-      return 'El teléfono solo debe contener números.'
-    }
-    if (form.password.length < 8) {
-      return 'La contraseña debe tener mínimo 8 caracteres.'
-    }
-    if (!/[A-Z]/.test(form.password)) {
-      return 'La contraseña debe contener al menos una letra mayúscula.'
-    }
-    if (!/\d.*\d/.test(form.password)) {
-      return 'La contraseña debe contener al menos 2 números.'
-    }
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password)) {
-      return 'La contraseña debe contener al menos un carácter especial.'
-    }
+    if (form.telefono && form.telefono.length !== 9) return 'El teléfono debe tener exactamente 9 dígitos.'
+    if (form.telefono && !/^\d+$/.test(form.telefono)) return 'El teléfono solo debe contener números.'
+    if (form.password.length < 8) return 'La contraseña debe tener mínimo 8 caracteres.'
+    if (!/[A-Z]/.test(form.password)) return 'Debe contener al menos una mayúscula.'
+    if (!/\d.*\d/.test(form.password)) return 'Debe contener al menos 2 números.'
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password)) return 'Debe contener al menos un carácter especial.'
     return null
   }
 
@@ -95,13 +67,8 @@ export default function PanelAdmin() {
     e.preventDefault()
     setErrorForm('')
     setExito('')
-
     const errorValidacion = validarFormulario()
-    if (errorValidacion) {
-      setErrorForm(errorValidacion)
-      return
-    }
-
+    if (errorValidacion) { setErrorForm(errorValidacion); return }
     setGuardando(true)
 
     try {
@@ -109,57 +76,28 @@ export default function PanelAdmin() {
       const tokenActual = sesionActual?.session?.access_token
       const refreshActual = sesionActual?.session?.refresh_token
 
-      const { data, error: authError } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.password,
-      })
+      const { data, error: authError } = await supabase.auth.signUp({ email: form.email, password: form.password })
 
       if (authError) {
-        if (tokenActual && refreshActual) {
-          await supabase.auth.setSession({
-            access_token: tokenActual,
-            refresh_token: refreshActual,
-          })
-        }
+        if (tokenActual && refreshActual) await supabase.auth.setSession({ access_token: tokenActual, refresh_token: refreshActual })
         setErrorForm(authError.message)
         setGuardando(false)
         return
       }
 
       const userId = data?.user?.id
+      await conReintentos(() => supabase.from('perfiles').insert({
+        id: userId, nombre: form.nombre, apellido: form.apellido, telefono: form.telefono, rol: form.rol,
+      }))
 
-      const { error: perfilError } = await conReintentos(() =>
-        supabase.from('perfiles').insert({
-          id: userId,
-          nombre: form.nombre,
-          apellido: form.apellido,
-          telefono: form.telefono,
-          rol: form.rol,
-        })
-      )
-
-      if (tokenActual && refreshActual) {
-        await supabase.auth.setSession({
-          access_token: tokenActual,
-          refresh_token: refreshActual,
-        })
-      }
-
-      if (perfilError && perfilError.code !== '23505') {
-        setErrorForm(perfilError.message)
-        setGuardando(false)
-        return
-      }
+      if (tokenActual && refreshActual) await supabase.auth.setSession({ access_token: tokenActual, refresh_token: refreshActual })
 
       setExito('✅ Usuario creado correctamente')
       setForm({ nombre: '', apellido: '', telefono: '', email: '', password: '', rol: 'recepcionista' })
+      setVista('lista')
       cargarUsuarios()
-
-    } catch {
-      setErrorForm('Error inesperado')
-    } finally {
-      setGuardando(false)
-    }
+    } catch { setErrorForm('Error inesperado') }
+    finally { setGuardando(false) }
   }
 
   const coloresPorRol = {
@@ -169,72 +107,216 @@ export default function PanelAdmin() {
     paciente: 'bg-orange-100 text-orange-700',
   }
 
-  return (
-    <div className="min-h-screen bg-gray-100 flex">
+  const resumenRoles = ['administrador', 'recepcionista', 'odontologo', 'paciente']
 
-      {/* Sidebar */}
+  return (
+    <div className="min-h-screen bg-gray-50 flex">
       <Sidebar rol="administrador" />
 
-      {/* Contenido */}
-      <div className="flex-1 px-4 py-8 pt-16 md:pt-8 md:ml-64">
+      <div className="flex-1 ml-64">
 
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">👥 Gestión de Usuarios</h2>
-
-          {vista === 'lista' && (
-            <button
-              onClick={() => setVista('nuevo')}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg"
-            >
-              + Crear staff
-            </button>
-          )}
+        {/* Header */}
+        <div className="bg-white shadow-sm px-8 py-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-xl font-bold text-gray-800">Panel Administrador</h1>
+            <p className="text-xs text-gray-400">
+              {new Date().toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {perfil?.avatar_url ? (
+              <img src={perfil.avatar_url} alt="Avatar" className="w-9 h-9 rounded-full object-cover border-2 border-purple-500" />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                {perfil?.nombre?.charAt(0)}{perfil?.apellido?.charAt(0)}
+              </div>
+            )}
+            <div>
+              <p className="text-sm font-semibold text-gray-800">¡Hola, {perfil?.nombre}! 👋</p>
+              <p className="text-xs text-gray-400 capitalize">{perfil?.rol}</p>
+            </div>
+          </div>
         </div>
 
-        {vista === 'nuevo' && (
-          <form onSubmit={handleCrearStaff} className="bg-white p-6 rounded-xl shadow space-y-4 mb-6">
-            <input name="nombre" placeholder="Nombre" onChange={handleChange} value={form.nombre} className="w-full border p-2 rounded" />
-            <input name="apellido" placeholder="Apellido" onChange={handleChange} value={form.apellido} className="w-full border p-2 rounded" />
-            <input name="telefono" placeholder="Teléfono" onChange={handleChange} value={form.telefono} className="w-full border p-2 rounded" />
-            <input name="email" placeholder="Correo" onChange={handleChange} value={form.email} className="w-full border p-2 rounded" />
-            <input type="password" name="password" placeholder="Contraseña" onChange={handleChange} value={form.password} className="w-full border p-2 rounded" />
+        {/* Hero */}
+        <div className="bg-gradient-to-r from-purple-700 to-purple-900 text-white px-8 py-10">
+          <h2 className="text-3xl font-bold mb-1">Bienvenido, {perfil?.nombre} 👋</h2>
+          <p className="text-purple-200">Administra usuarios, pacientes y citas del sistema</p>
+        </div>
 
-            <button disabled={guardando} className="bg-purple-600 text-white px-4 py-2 rounded">
-              {guardando ? 'Creando...' : 'Crear'}
+        <div className="px-8 py-8">
+
+          {/* Resumen por roles */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            {resumenRoles.map((rol) => (
+              <div key={rol} className="bg-white rounded-2xl shadow-sm p-5 text-center">
+                <p className="text-3xl font-bold text-gray-800">
+                  {usuarios.filter(u => u.rol === rol).length}
+                </p>
+                <p className="text-sm text-gray-500 capitalize mt-1">{rol}s</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Accesos rápidos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <button
+              onClick={() => navigate('/pacientes')}
+              className="bg-white rounded-2xl shadow-sm p-6 text-left hover:shadow-md transition border-l-4 border-green-500 group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center text-3xl">🏥</div>
+                <div>
+                  <p className="text-lg font-bold text-gray-800">Ver Pacientes</p>
+                  <p className="text-sm text-gray-500">Consultar registro de pacientes</p>
+                </div>
+              </div>
             </button>
+            <button
+              onClick={() => navigate('/citas')}
+              className="bg-white rounded-2xl shadow-sm p-6 text-left hover:shadow-md transition border-l-4 border-blue-500 group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center text-3xl">📅</div>
+                <div>
+                  <p className="text-lg font-bold text-gray-800">Ver Citas</p>
+                  <p className="text-sm text-gray-500">Consultar todas las citas</p>
+                </div>
+              </div>
+            </button>
+          </div>
 
-            {errorForm && <p className="text-red-500 text-sm">{errorForm}</p>}
-            {exito && <p className="text-green-600 text-sm">{exito}</p>}
-          </form>
-        )}
+          {/* Gestión de usuarios */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b flex justify-between items-center">
+              <h3 className="font-bold text-gray-800">👥 Gestión de Usuarios</h3>
+              <button
+                onClick={() => setVista(vista === 'nuevo' ? 'lista' : 'nuevo')}
+                className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+              >
+                {vista === 'nuevo' ? '✕ Cancelar' : '+ Crear staff'}
+              </button>
+            </div>
 
-        {cargando ? (
-          <p>Cargando...</p>
-        ) : (
-          <table className="w-full bg-white rounded-xl shadow text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="p-3 text-left">Nombre</th>
-                <th className="p-3 text-left">Teléfono</th>
-                <th className="p-3 text-left">Rol</th>
-              </tr>
-            </thead>
-            <tbody>
-              {usuarios.map((u) => (
-                <tr key={u.id} className="border-t">
-                  <td className="p-3">{u.nombre} {u.apellido}</td>
-                  <td className="p-3">{u.telefono}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-1 rounded ${coloresPorRol[u.rol]}`}>
-                      {u.rol}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+            {/* Formulario crear staff */}
+            {vista === 'nuevo' && (
+              <div className="p-6 border-b bg-gray-50">
+                {errorForm && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-xl text-sm mb-4">{errorForm}</div>}
+                {exito && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-xl text-sm mb-4">{exito}</div>}
 
+                <form onSubmit={handleCrearStaff} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                      <input name="nombre" value={form.nombre} onChange={handleChange} required placeholder="Ingrese el nombre"
+                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
+                      <input name="apellido" value={form.apellido} onChange={handleChange} required placeholder="Ingrese el apellido"
+                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                      <input name="telefono" value={form.telefono} onChange={handleChange} placeholder="9 dígitos"
+                        inputMode="numeric" maxLength={9}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+                      <select name="rol" value={form.rol} onChange={handleChange}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                        <option value="recepcionista">Recepcionista</option>
+                        <option value="odontologo">Odontólogo</option>
+                        <option value="administrador">Administrador</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
+                    <input type="email" name="email" value={form.email} onChange={handleChange} required placeholder="correo@ejemplo.com"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña temporal</label>
+                    <input type="password" name="password" value={form.password} onChange={handleChange} required
+                      placeholder="Mínimo 8 caracteres, mayúscula, número y símbolo"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white" />
+                    {form.password && (
+                      <div className="mt-2 space-y-1">
+                        {[
+                          [form.password.length >= 8, 'Mínimo 8 caracteres'],
+                          [/[A-Z]/.test(form.password), 'Al menos una mayúscula'],
+                          [/\d.*\d/.test(form.password), 'Al menos 2 números'],
+                          [/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password), 'Al menos un carácter especial'],
+                        ].map(([ok, label]) => (
+                          <p key={label} className={`text-xs flex items-center gap-1 ${ok ? 'text-green-600' : 'text-red-500'}`}>
+                            {ok ? '✅' : '❌'} {label}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button type="submit" disabled={guardando}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition disabled:opacity-50">
+                    {guardando ? 'Creando...' : 'Crear usuario'}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Tabla usuarios */}
+            {cargando ? (
+              <p className="text-center text-gray-400 py-8 animate-pulse">Cargando usuarios...</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="text-left px-6 py-3 text-gray-600">Nombre</th>
+                    <th className="text-left px-6 py-3 text-gray-600">Teléfono</th>
+                    <th className="text-left px-6 py-3 text-gray-600">Rol actual</th>
+                    <th className="text-left px-6 py-3 text-gray-600">Cambiar rol</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usuarios.map((u) => (
+                    <tr key={u.id} className="border-b hover:bg-gray-50">
+                      <td className="px-6 py-4 font-medium text-gray-800">{u.nombre} {u.apellido}</td>
+                      <td className="px-6 py-4 text-gray-600">{u.telefono || '—'}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${coloresPorRol[u.rol]}`}>
+                          {u.rol}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <select value={u.rol} onChange={(e) => cambiarRol(u.id, e.target.value)}
+                          className="border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+                          <option value="administrador">Administrador</option>
+                          <option value="recepcionista">Recepcionista</option>
+                          <option value="odontologo">Odontólogo</option>
+                          <option value="paciente">Paciente</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <footer className="bg-gray-900 text-gray-400 py-6 px-8 mt-8">
+          <div className="flex justify-between items-center text-sm">
+            <div className="flex items-center gap-2">
+              <span>🦷</span>
+              <span className="text-white font-semibold">DentaNovax</span>
+            </div>
+            <p>© 2026 DentaNovax. Todos los derechos reservados.</p>
+          </div>
+        </footer>
       </div>
     </div>
   )

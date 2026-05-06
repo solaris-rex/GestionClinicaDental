@@ -1,6 +1,6 @@
 // src/pages/paciente/PanelPaciente.jsx
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import Sidebar from '../../components/layout/Sidebar'
@@ -22,6 +22,8 @@ const HORAS_DISPONIBLES = [
 export default function PanelPaciente() {
   const { perfil } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  
   const [citas, setCitas] = useState([])
   const [odontologos, setOdontologos] = useState([])
   const [pacienteId, setPacienteId] = useState(null)
@@ -38,6 +40,16 @@ export default function PanelPaciente() {
     hora: '',
     motivo: '',
   })
+
+  // Sincronizar vista con URL
+  useEffect(() => {
+    const vistaParam = searchParams.get('vista')
+    if (vistaParam === 'nueva') {
+      setVista('nueva')
+    } else {
+      setVista('lista')
+    }
+  }, [searchParams])
 
   useEffect(() => {
     if (perfil?.id) cargarDatos()
@@ -103,11 +115,6 @@ export default function PanelPaciente() {
     if (disponibilidad === false) { setError('El odontólogo ya tiene cita en ese horario.'); return }
     setGuardando(true)
 
-    const timeoutId = setTimeout(() => {
-      setGuardando(false)
-      setError('La operación tardó demasiado. Intenta de nuevo.')
-    }, 10000)
-
     try {
       const { error: citaError } = await crearCita({
         paciente_id: pacienteId,
@@ -117,17 +124,19 @@ export default function PanelPaciente() {
         motivo: form.motivo,
         estado: 'programada',
       })
-      clearTimeout(timeoutId)
       if (citaError) { setError('Error al solicitar la cita: ' + citaError.message); setGuardando(false); return }
+      
       await cargarCitas(pacienteId)
-      setVista('lista')
       setForm({ odontologo_id: '', fecha: '', hora: '', motivo: '' })
       setDisponibilidad(null)
       setExitoCita(true)
+      
+      // Volver a la lista después de éxito
+      navigate('/paciente?vista=lista')
       setTimeout(() => setExitoCita(false), 4000)
     } catch (err) {
-      clearTimeout(timeoutId)
       setError('Ocurrió un error inesperado.')
+    } finally {
       setGuardando(false)
     }
   }
@@ -149,11 +158,8 @@ export default function PanelPaciente() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
-      {/* Sidebar */}
       <Sidebar rol="paciente" />
 
-      {/* ===== NAVBAR ===== */}
       <nav className="bg-white shadow-sm sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-6 py-3 flex justify-between items-center">
           <div className="flex items-center gap-2 ml-12">
@@ -184,7 +190,6 @@ export default function PanelPaciente() {
         </div>
       </nav>
 
-      {/* ===== HERO ===== */}
       <div className="bg-gradient-to-r from-teal-600 to-teal-700 text-white py-10 px-6">
         <div className="max-w-6xl mx-auto">
           <h1 className="text-3xl font-bold mb-1">
@@ -195,15 +200,12 @@ export default function PanelPaciente() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-8">
-
-        {/* Mensaje de éxito */}
         {exitoCita && (
           <div className="bg-green-100 border border-green-300 text-green-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-2">
             ✅ ¡Cita solicitada exitosamente! Te esperamos.
           </div>
         )}
 
-        {/* Tarjetas resumen */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="bg-white rounded-2xl shadow-sm p-6 text-center border-t-4 border-teal-500">
             <p className="text-4xl font-bold text-teal-600">{citasPendientes.length}</p>
@@ -215,20 +217,19 @@ export default function PanelPaciente() {
           </div>
           <div
             className="bg-teal-600 rounded-2xl shadow-sm p-6 text-center cursor-pointer hover:bg-teal-700 transition"
-            onClick={() => { setVista('nueva'); setError('') }}
+            onClick={() => navigate('/paciente?vista=nueva')}
           >
             <p className="text-4xl mb-1">📅</p>
             <p className="text-white font-semibold">+ Solicitar nueva cita</p>
           </div>
         </div>
 
-        {/* Formulario nueva cita */}
         {vista === 'nueva' && (
           <div className="bg-white rounded-2xl shadow-sm p-8 mb-8">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-gray-800">📅 Solicitar nueva cita</h2>
               <button
-                onClick={() => { setVista('lista'); setError(''); setDisponibilidad(null) }}
+                onClick={() => navigate('/paciente?vista=lista')}
                 className="text-gray-400 hover:text-gray-600 text-sm"
               >
                 ✕ Cancelar
@@ -238,12 +239,6 @@ export default function PanelPaciente() {
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 text-sm">
                 {error}
-              </div>
-            )}
-
-            {!pacienteId && !cargando && (
-              <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-xl mb-4 text-sm">
-                ⚠️ Tu cuenta no está vinculada. Comunícate con recepción.
               </div>
             )}
 
@@ -296,9 +291,7 @@ export default function PanelPaciente() {
 
               {disponibilidad !== null && (
                 <div className={`px-4 py-3 rounded-xl text-sm font-medium ${
-                  disponibilidad
-                    ? 'bg-green-50 border border-green-200 text-green-700'
-                    : 'bg-red-50 border border-red-200 text-red-700'
+                  disponibilidad ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
                 }`}>
                   {disponibilidad ? '✅ Horario disponible' : '❌ Horario ocupado — elige otro'}
                 </div>
@@ -328,7 +321,6 @@ export default function PanelPaciente() {
           </div>
         )}
 
-        {/* Lista de citas */}
         {vista === 'lista' && (
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
             <div className="px-6 py-5 border-b">
@@ -343,12 +335,9 @@ export default function PanelPaciente() {
               <div className="text-center py-16">
                 <p className="text-5xl mb-4">📭</p>
                 <p className="text-gray-600 font-medium">No tienes citas registradas aún</p>
-                <p className="text-sm text-gray-400 mt-2 mb-6">
-                  Solicita tu primera cita haciendo clic arriba
-                </p>
                 <button
-                  onClick={() => { setVista('nueva'); setError('') }}
-                  className="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-6 py-2 rounded-xl transition"
+                  onClick={() => navigate('/paciente?vista=nueva')}
+                  className="mt-4 bg-teal-600 hover:bg-teal-700 text-white font-semibold px-6 py-2 rounded-xl transition"
                 >
                   + Solicitar cita
                 </button>
@@ -366,9 +355,6 @@ export default function PanelPaciente() {
                           <p className="text-xl font-bold text-teal-700">
                             {cita.fecha?.split('-')[2]}
                           </p>
-                          <p className="text-xs text-teal-500">
-                            {['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(cita.fecha?.split('-')[1]) - 1]}
-                          </p>
                         </div>
                         <div>
                           <p className="font-semibold text-gray-800">
@@ -377,9 +363,6 @@ export default function PanelPaciente() {
                           <p className="text-sm text-gray-500 mt-1">
                             Dr. {cita.odontologo?.nombre} {cita.odontologo?.apellido}
                           </p>
-                          {cita.motivo && (
-                            <p className="text-sm text-gray-400 mt-1">📋 {cita.motivo}</p>
-                          )}
                         </div>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${COLORES_ESTADO[cita.estado]}`}>
@@ -394,7 +377,6 @@ export default function PanelPaciente() {
         )}
       </div>
 
-      {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-6 px-6 mt-12">
         <div className="max-w-6xl mx-auto flex justify-between items-center text-sm">
           <div className="flex items-center gap-2">

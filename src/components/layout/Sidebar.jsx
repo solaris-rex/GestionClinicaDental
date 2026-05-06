@@ -25,10 +25,13 @@ const MENUS = {
     { icono: '🗓️', label: 'Próximas citas', ruta: '/odontologo' },
   ],
   paciente: [
-    { icono: '📅', label: 'Mis citas', ruta: '/paciente' },
-    { icono: '➕', label: 'Solicitar cita', ruta: '/paciente' },
+    { icono: '📅', label: 'Mis citas', ruta: '/paciente?vista=lista' },
+    { icono: '➕', label: 'Solicitar cita', ruta: '/paciente?vista=nueva' },
   ],
 }
+
+// Roles que tienen sidebar FIJO (no colapsable)
+const ROLES_FIJOS = ['administrador', 'recepcionista', 'odontologo']
 
 export default function Sidebar({ rol = 'publico' }) {
   const [abierto, setAbierto] = useState(false)
@@ -40,31 +43,18 @@ export default function Sidebar({ rol = 'publico' }) {
 
   const menu = MENUS[rol] || MENUS.publico
   const esPublico = rol === 'publico'
+  const esFijo = ROLES_FIJOS.includes(rol)
 
   async function handleSubirFoto(e) {
     const archivo = e.target.files[0]
     if (!archivo || !perfil?.id) return
-
     setSubiendoFoto(true)
     try {
       const extension = archivo.name.split('.').pop()
       const nombreArchivo = `${perfil.id}.${extension}`
-
-      const { error: errorSubida } = await supabase.storage
-        .from('avatars')
-        .upload(nombreArchivo, archivo, { upsert: true })
-
-      if (errorSubida) throw errorSubida
-
-      const { data: urlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(nombreArchivo)
-
-      await supabase
-        .from('perfiles')
-        .update({ avatar_url: urlData.publicUrl })
-        .eq('id', perfil.id)
-
+      await supabase.storage.from('avatars').upload(nombreArchivo, archivo, { upsert: true })
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(nombreArchivo)
+      await supabase.from('perfiles').update({ avatar_url: urlData.publicUrl }).eq('id', perfil.id)
       window.location.reload()
     } catch (err) {
       console.error('Error subiendo foto:', err)
@@ -80,21 +70,125 @@ export default function Sidebar({ rol = 'publico' }) {
     } else if (item.ruta) {
       navigate(item.ruta)
     }
-    setAbierto(false)
+    if (!esFijo) setAbierto(false)
   }
 
   function estaActivo(item) {
-    if (item.ruta) return location.pathname === item.ruta
+    if (item.ruta) {
+      const rutaBase = item.ruta.split('?')[0]
+      return location.pathname === rutaBase
+    }
     return false
   }
 
-  // Si no hay sesión y no es una ruta pública, no renderizamos nada del componente
   if (!perfil && !esPublico) return null
 
+  // ===== SIDEBAR FIJO para Admin, Recep, Odontólogo =====
+  if (esFijo) {
+    return (
+      <div className="fixed top-0 left-0 h-full w-64 z-40 flex flex-col bg-gray-900 text-white shadow-2xl">
+
+        {/* Header */}
+        <div className="px-5 py-5 border-b border-gray-700">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xl">🦷</span>
+            <span className="font-bold text-white text-lg">DentaNovax</span>
+          </div>
+          {perfil && (
+            <div className="bg-gray-800 rounded-xl p-3 flex items-center gap-3">
+              {perfil.avatar_url ? (
+                <img src={perfil.avatar_url} alt="Avatar"
+                  className="w-9 h-9 rounded-full object-cover border-2 border-teal-500" />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-teal-600 flex items-center justify-center text-white font-bold text-sm">
+                  {perfil.nombre?.charAt(0)}{perfil.apellido?.charAt(0)}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-white font-semibold text-sm truncate">
+                  {perfil.nombre} {perfil.apellido}
+                </p>
+                <p className="text-gray-400 text-xs capitalize">{perfil.rol}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Menú */}
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          <button
+            onClick={() => navigate('/')}
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition text-sm"
+          >
+            <span>🏠</span><span>Inicio</span>
+          </button>
+          <div className="border-t border-gray-700 my-2" />
+          {menu.map((item) => (
+            <button
+              key={item.label}
+              onClick={() => handleNavegar(item)}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition
+                ${estaActivo(item)
+                  ? 'bg-teal-600 text-white font-medium'
+                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+            >
+              <span>{item.icono}</span>
+              <span>{item.label}</span>
+              {estaActivo(item) && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white" />}
+            </button>
+          ))}
+        </nav>
+
+        {/* Footer */}
+        <div className="border-t border-gray-700 p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="relative">
+              {perfil?.avatar_url ? (
+                <img src={perfil.avatar_url} alt="Avatar"
+                  className="w-10 h-10 rounded-full object-cover border-2 border-teal-500" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-teal-600 flex items-center justify-center text-white font-bold text-sm">
+                  {perfil?.nombre?.charAt(0)}{perfil?.apellido?.charAt(0)}
+                </div>
+              )}
+              <button
+                onClick={() => inputFoto.current?.click()}
+                className="absolute -bottom-0.5 -right-0.5 bg-gray-700 hover:bg-teal-600 rounded-full w-4 h-4 flex items-center justify-center text-xs transition"
+                title="Cambiar foto"
+              >📷</button>
+              <input type="file" ref={inputFoto} onChange={handleSubirFoto} accept="image/*" className="hidden" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-semibold text-sm truncate">
+                {perfil?.nombre} {perfil?.apellido}
+              </p>
+              <p className="text-gray-400 text-xs truncate">{perfil?.email || perfil?.rol}</p>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <button
+              onClick={() => navigate('/perfil')}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition text-xs"
+            >
+              <span>⚙️</span><span>Editar perfil</span>
+            </button>
+            <button
+              onClick={cerrarSesion}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-red-400 hover:bg-red-900 hover:bg-opacity-30 transition text-xs"
+            >
+              <span>🚪</span><span>Cerrar sesión</span>
+            </button>
+          </div>
+          {subiendoFoto && <p className="text-xs text-teal-400 text-center mt-2 animate-pulse">Subiendo foto...</p>}
+        </div>
+      </div>
+    )
+  }
+
+  // ===== SIDEBAR COLAPSABLE para Landing y Paciente =====
   return (
     <>
-      {/* Botón hamburguesa — Solo visible si hay sesión iniciada (perfil existe) */}
-      {perfil && (
+      {(perfil || esPublico) && (
         <button
           onClick={() => setAbierto(!abierto)}
           className="fixed top-4 left-4 z-50 bg-white shadow-lg rounded-xl w-10 h-10 flex flex-col items-center justify-center gap-1.5 hover:bg-gray-50 transition"
@@ -105,51 +199,35 @@ export default function Sidebar({ rol = 'publico' }) {
         </button>
       )}
 
-      {/* Overlay */}
       {abierto && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40"
-          onClick={() => setAbierto(false)}
-        />
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setAbierto(false)} />
       )}
 
-      {/* Sidebar */}
       <div className={`fixed top-0 left-0 h-full w-64 z-50 flex flex-col
         transform transition-transform duration-300 ease-in-out
         ${abierto ? 'translate-x-0' : '-translate-x-full'}
         bg-gray-900 text-white shadow-2xl`}
       >
-        {/* ===== HEADER DEL SIDEBAR ===== */}
         <div className="px-5 py-5 border-b border-gray-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xl">🦷</span>
             <span className="font-bold text-white text-lg">DentaNovax</span>
           </div>
-          <button
-            onClick={() => setAbierto(false)}
-            className="text-gray-400 hover:text-white transition text-lg"
-          >
-            ✕
-          </button>
+          <button onClick={() => setAbierto(false)} className="text-gray-400 hover:text-white transition text-lg">✕</button>
         </div>
 
-        {/* ===== MENÚ CENTRAL ===== */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-
-          {/* Volver a inicio — solo paneles internos */}
           {!esPublico && (
             <>
               <button
                 onClick={() => { navigate('/'); setAbierto(false) }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition text-sm"
               >
-                <span className="text-base">🏠</span>
-                <span>Inicio</span>
+                <span>🏠</span><span>Inicio</span>
               </button>
               <div className="border-t border-gray-700 my-2" />
             </>
           )}
-
           {menu.map((item) => (
             <button
               key={item.label}
@@ -157,77 +235,51 @@ export default function Sidebar({ rol = 'publico' }) {
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition
                 ${estaActivo(item)
                   ? 'bg-teal-600 text-white font-medium'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                }`}
+                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
             >
-              <span className="text-base">{item.icono}</span>
+              <span>{item.icono}</span>
               <span>{item.label}</span>
-              {estaActivo(item) && (
-                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white" />
-              )}
+              {estaActivo(item) && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white" />}
             </button>
           ))}
         </nav>
 
-        {/* ===== FOOTER DEL SIDEBAR — Info del usuario ===== */}
         <div className="border-t border-gray-700 p-4">
           {perfil ? (
             <div>
-              {/* Foto y datos del usuario */}
               <div className="flex items-center gap-3 mb-3">
                 <div className="relative">
                   {perfil.avatar_url ? (
-                    <img
-                      src={perfil.avatar_url}
-                      alt="Avatar"
-                      className="w-10 h-10 rounded-full object-cover border-2 border-teal-500"
-                    />
+                    <img src={perfil.avatar_url} alt="Avatar"
+                      className="w-10 h-10 rounded-full object-cover border-2 border-teal-500" />
                   ) : (
                     <div className="w-10 h-10 rounded-full bg-teal-600 flex items-center justify-center text-white font-bold text-sm">
                       {perfil.nombre?.charAt(0)}{perfil.apellido?.charAt(0)}
                     </div>
                   )}
-                  {/* Botón cambiar foto */}
                   <button
                     onClick={() => inputFoto.current?.click()}
                     className="absolute -bottom-0.5 -right-0.5 bg-gray-700 hover:bg-teal-600 rounded-full w-4 h-4 flex items-center justify-center text-xs transition"
-                    title="Cambiar foto"
-                  >
-                    📷
-                  </button>
-                  <input
-                    type="file"
-                    ref={inputFoto}
-                    onChange={handleSubirFoto}
-                    accept="image/*"
-                    className="hidden"
-                  />
+                  >📷</button>
+                  <input type="file" ref={inputFoto} onChange={handleSubirFoto} accept="image/*" className="hidden" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-white font-semibold text-sm truncate">
-                    {perfil.nombre} {perfil.apellido}
-                  </p>
-                  <p className="text-gray-400 text-xs truncate">
-                    {perfil.email || perfil.rol}
-                  </p>
+                  <p className="text-white font-semibold text-sm truncate">{perfil.nombre} {perfil.apellido}</p>
+                  <p className="text-gray-400 text-xs truncate">{perfil.email || perfil.rol}</p>
                 </div>
               </div>
-
-              {/* Botones de acción */}
               <div className="space-y-1">
                 <button
                   onClick={() => { navigate('/perfil'); setAbierto(false) }}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition text-xs"
                 >
-                  <span>⚙️</span>
-                  <span>Editar perfil</span>
+                  <span>⚙️</span><span>Editar perfil</span>
                 </button>
                 <button
                   onClick={() => { cerrarSesion(); setAbierto(false) }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-red-400 hover:bg-red-900 hover:bg-opacity-30 hover:text-red-300 transition text-xs"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-red-400 hover:bg-red-900 hover:bg-opacity-30 transition text-xs"
                 >
-                  <span>🚪</span>
-                  <span>Cerrar sesión</span>
+                  <span>🚪</span><span>Cerrar sesión</span>
                 </button>
               </div>
             </div>
@@ -236,16 +288,10 @@ export default function Sidebar({ rol = 'publico' }) {
               onClick={() => { navigate('/login'); setAbierto(false) }}
               className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-medium transition text-sm"
             >
-              <span>🔐</span>
-              <span>Iniciar sesión</span>
+              <span>🔐</span><span>Iniciar sesión</span>
             </button>
           )}
-
-          {subiendoFoto && (
-            <p className="text-xs text-teal-400 text-center mt-2 animate-pulse">
-              Subiendo foto...
-            </p>
-          )}
+          {subiendoFoto && <p className="text-xs text-teal-400 text-center mt-2 animate-pulse">Subiendo foto...</p>}
         </div>
       </div>
     </>
