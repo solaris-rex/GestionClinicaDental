@@ -1,7 +1,9 @@
 // src/pages/recepcionista/GestionPacientes.jsx
 import { useEffect, useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import Sidebar from '../../components/layout/Sidebar'
 import FormularioPaciente from '../../components/pacientes/FormularioPaciente'
+import { useAuth } from '../../context/AuthContext'
 import {
   obtenerPacientes,
   buscarPacientes,
@@ -10,15 +12,22 @@ import {
 } from '../../services/pacientesService'
 
 export default function GestionPacientes() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { perfil } = useAuth()
   const [pacientes, setPacientes] = useState([])
   const [cargando, setCargando] = useState(true)
   const [busqueda, setBusqueda] = useState('')
   const [vista, setVista] = useState('lista')
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState(null)
 
-  useEffect(() => {
-    cargarPacientes()
-  }, [])
+  useEffect(() => { cargarPacientes() }, [])
+
+  // Determinar a dónde volver según el rol o el state
+  function getRutaVolver() {
+    if (perfil?.rol === 'administrador') return '/admin'
+    return '/recepcionista'
+  }
 
   async function cargarPacientes() {
     setCargando(true)
@@ -30,7 +39,6 @@ export default function GestionPacientes() {
   async function handleBusqueda(e) {
     const termino = e.target.value
     setBusqueda(termino)
-
     if (termino.trim() === '') {
       cargarPacientes()
     } else {
@@ -71,19 +79,22 @@ export default function GestionPacientes() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
-
-      {/* Sidebar */}
       <Sidebar rol="recepcionista" />
 
-      {/* Contenido */}
       <div className="flex-1 px-4 py-8 pt-16 md:pt-8 md:ml-64">
 
         {/* Encabezado */}
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">
-            🏥 Gestión de Pacientes
-          </h2>
-
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(getRutaVolver())}
+              className="flex items-center gap-1.5 bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-600 hover:text-gray-800 text-sm font-medium px-3 py-1.5 rounded-lg shadow-sm transition"
+            >
+              <span className="text-base">←</span>
+              <span>Volver</span>
+            </button>
+            <h2 className="text-2xl font-bold text-gray-800">🏥 Gestión de Pacientes</h2>
+          </div>
           {vista === 'lista' && (
             <button
               onClick={() => setVista('nuevo')}
@@ -94,12 +105,9 @@ export default function GestionPacientes() {
           )}
         </div>
 
-        {/* Nuevo */}
         {vista === 'nuevo' && (
           <div className="bg-white rounded-2xl shadow p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Registrar nuevo paciente
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Registrar nuevo paciente</h3>
             <FormularioPaciente
               onGuardar={handleGuardarNuevo}
               onCancelar={() => setVista('lista')}
@@ -107,7 +115,6 @@ export default function GestionPacientes() {
           </div>
         )}
 
-        {/* Editar */}
         {vista === 'editar' && pacienteSeleccionado && (
           <div className="bg-white rounded-2xl shadow p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
@@ -121,7 +128,6 @@ export default function GestionPacientes() {
           </div>
         )}
 
-        {/* Lista */}
         {vista === 'lista' && (
           <>
             <div className="mb-4">
@@ -152,16 +158,12 @@ export default function GestionPacientes() {
                     {pacientes.map((p) => (
                       <tr key={p.id} className="border-b hover:bg-gray-50">
                         <td className="px-4 py-3">
-                          <p className="font-medium text-gray-800">
-                            {p.nombre} {p.apellido}
-                          </p>
+                          <p className="font-medium text-gray-800">{p.nombre} {p.apellido}</p>
                           <p className="text-xs text-gray-400">{p.email || '—'}</p>
                         </td>
                         <td className="px-4 py-3 text-gray-600">{p.dni}</td>
                         <td className="px-4 py-3 text-gray-600">{p.telefono || '—'}</td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {calcularEdad(p.fecha_nacimiento)} años
-                        </td>
+                        <td className="px-4 py-3 text-gray-600">{calcularEdad(p.fecha_nacimiento)} años</td>
                         <td className="px-4 py-3">
                           <button
                             onClick={() => handleEditar(p)}
@@ -175,20 +177,14 @@ export default function GestionPacientes() {
                   </tbody>
                 </table>
               )}
-
               {!cargando && pacientes.length === 0 && (
-                <p className="text-center text-gray-400 py-8">
-                  No se encontraron pacientes
-                </p>
+                <p className="text-center text-gray-400 py-8">No se encontraron pacientes</p>
               )}
             </div>
 
-            <p className="text-sm text-gray-400 mt-3">
-              Total: {pacientes.length} paciente(s)
-            </p>
+            <p className="text-sm text-gray-400 mt-3">Total: {pacientes.length} paciente(s)</p>
           </>
         )}
-
       </div>
     </div>
   )

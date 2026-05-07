@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/layout/Sidebar'
 import { obtenerCitasPorOdontologo } from '../../services/citasService'
+import { useNavigate } from 'react-router-dom'
 
 const COLORES_ESTADO = {
   programada: 'bg-blue-100 text-blue-700',
@@ -12,7 +13,8 @@ const COLORES_ESTADO = {
 }
 
 export default function PanelOdontologo() {
-  const { perfil } = useAuth()
+  const navigate = useNavigate()
+  const { perfil, cerrarSesion } = useAuth()
   const [citas, setCitas] = useState([])
   const [cargando, setCargando] = useState(true)
   const [vistaActiva, setVistaActiva] = useState('hoy')
@@ -52,22 +54,40 @@ export default function PanelOdontologo() {
         {/* Header */}
         <div className="bg-white shadow-sm px-8 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-xl font-bold text-gray-800">Panel Odontólogo</h1>
+            <h1 className="text-xl font-bold text-gray-800">Panel Recepcionista</h1>
             <p className="text-xs text-gray-400">
               {new Date().toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {/* ⚙️ a la izquierda de la foto */}
+            <button
+              onClick={() => navigate('/perfil')}
+              className="text-gray-400 hover:text-gray-600 transition text-lg"
+              title="Editar perfil"
+            >
+              ⚙️
+            </button>
+            {/* Foto */}
             {perfil?.avatar_url ? (
-              <img src={perfil.avatar_url} alt="Avatar" className="w-9 h-9 rounded-full object-cover border-2 border-blue-500" />
+              <img src={perfil.avatar_url} alt="Avatar" className="w-9 h-9 rounded-full object-cover border-2 border-green-500" />
             ) : (
-              <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
+              <div className="w-9 h-9 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-sm">
                 {perfil?.nombre?.charAt(0)}{perfil?.apellido?.charAt(0)}
               </div>
             )}
+            {/* Nombre, rol y cerrar sesión */}
             <div>
-              <p className="text-sm font-semibold text-gray-800">¡Hola, Dr. {perfil?.nombre}! 👋</p>
-              <p className="text-xs text-gray-400">Odontólogo</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-gray-800">¡Hola, {perfil?.nombre}! 👋</p>
+                <button
+                  onClick={cerrarSesion}
+                  className="text-xs text-red-500 hover:text-red-700 transition font-medium"
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 capitalize">{perfil?.rol}</p>
             </div>
           </div>
         </div>

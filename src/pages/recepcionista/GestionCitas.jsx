@@ -1,5 +1,7 @@
 // src/pages/recepcionista/GestionCitas.jsx
 import { useEffect, useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/layout/Sidebar'
 import FormularioCita from '../../components/citas/FormularioCita'
 import {
@@ -17,15 +19,22 @@ const COLORES_ESTADO = {
 }
 
 export default function GestionCitas() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { perfil } = useAuth()
   const [citas, setCitas] = useState([])
   const [cargando, setCargando] = useState(true)
   const [vista, setVista] = useState('lista')
   const [citaSeleccionada, setCitaSeleccionada] = useState(null)
   const [filtroEstado, setFiltroEstado] = useState('todas')
 
-  useEffect(() => {
-    cargarCitas()
-  }, [])
+  useEffect(() => { cargarCitas() }, [])
+
+  // Determinar a dónde volver según el rol o el state
+  function getRutaVolver() {
+    if (perfil?.rol === 'administrador') return '/admin'
+    return '/recepcionista'
+  }
 
   async function cargarCitas() {
     setCargando(true)
@@ -74,17 +83,22 @@ export default function GestionCitas() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
-
-      {/* Sidebar */}
       <Sidebar rol="recepcionista" />
 
-      {/* Contenido */}
       <div className="flex-1 px-4 py-8 pt-16 md:pt-8 md:ml-64">
 
         {/* Encabezado */}
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">📅 Gestión de Citas</h2>
-
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(getRutaVolver())}
+              className="flex items-center gap-1.5 bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-600 hover:text-gray-800 text-sm font-medium px-3 py-1.5 rounded-lg shadow-sm transition"
+            >
+              <span className="text-base">←</span>
+              <span>Volver</span>
+            </button>
+            <h2 className="text-2xl font-bold text-gray-800">📅 Gestión de Citas</h2>
+          </div>
           {vista === 'lista' && (
             <button
               onClick={() => { setCitaSeleccionada(null); setVista('nuevo') }}
@@ -95,12 +109,9 @@ export default function GestionCitas() {
           )}
         </div>
 
-        {/* Nueva */}
         {vista === 'nuevo' && (
           <div className="bg-white rounded-2xl shadow p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Programar nueva cita
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Programar nueva cita</h3>
             <FormularioCita
               onGuardar={handleGuardarNueva}
               onCancelar={() => setVista('lista')}
@@ -108,7 +119,6 @@ export default function GestionCitas() {
           </div>
         )}
 
-        {/* Reprogramar */}
         {vista === 'reprogramar' && citaSeleccionada && (
           <div className="bg-white rounded-2xl shadow p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
@@ -128,10 +138,8 @@ export default function GestionCitas() {
           </div>
         )}
 
-        {/* Lista */}
         {vista === 'lista' && (
           <>
-            {/* Filtros */}
             <div className="flex gap-2 mb-4 flex-wrap">
               {['todas', 'programada', 'confirmada', 'cancelada', 'completada'].map((estado) => (
                 <button
@@ -148,7 +156,6 @@ export default function GestionCitas() {
               ))}
             </div>
 
-            {/* Tabla */}
             <div className="bg-white rounded-2xl shadow overflow-hidden">
               {cargando ? (
                 <p className="text-center text-gray-400 py-8">Cargando citas...</p>
@@ -168,22 +175,12 @@ export default function GestionCitas() {
                     {citasFiltradas.map((c) => (
                       <tr key={c.id} className="border-b hover:bg-gray-50">
                         <td className="px-4 py-3">
-                          <p className="font-medium text-gray-800">
-                            {c.paciente?.apellido}, {c.paciente?.nombre}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            DNI: {c.paciente?.dni}
-                          </p>
+                          <p className="font-medium text-gray-800">{c.paciente?.apellido}, {c.paciente?.nombre}</p>
+                          <p className="text-xs text-gray-400">DNI: {c.paciente?.dni}</p>
                         </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          Dr. {c.odontologo?.nombre} {c.odontologo?.apellido}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {formatearFecha(c.fecha)}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {c.hora?.slice(0, 5)}
-                        </td>
+                        <td className="px-4 py-3 text-gray-600">Dr. {c.odontologo?.nombre} {c.odontologo?.apellido}</td>
+                        <td className="px-4 py-3 text-gray-600">{formatearFecha(c.fecha)}</td>
+                        <td className="px-4 py-3 text-gray-600">{c.hora?.slice(0, 5)}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${COLORES_ESTADO[c.estado]}`}>
                             {c.estado}
@@ -191,7 +188,6 @@ export default function GestionCitas() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex gap-1 flex-wrap">
-
                             {c.estado !== 'cancelada' && c.estado !== 'completada' && (
                               <button
                                 onClick={() => { setCitaSeleccionada(c); setVista('reprogramar') }}
@@ -200,7 +196,6 @@ export default function GestionCitas() {
                                 📅 Reprogramar
                               </button>
                             )}
-
                             {c.estado === 'programada' && (
                               <button
                                 onClick={() => handleCambiarEstado(c.id, 'confirmada')}
@@ -209,7 +204,6 @@ export default function GestionCitas() {
                                 ✅ Confirmar
                               </button>
                             )}
-
                             {c.estado === 'confirmada' && (
                               <button
                                 onClick={() => handleCambiarEstado(c.id, 'completada')}
@@ -218,7 +212,6 @@ export default function GestionCitas() {
                                 🏁 Completar
                               </button>
                             )}
-
                             {c.estado !== 'cancelada' && c.estado !== 'completada' && (
                               <button
                                 onClick={() => handleCambiarEstado(c.id, 'cancelada')}
@@ -227,7 +220,6 @@ export default function GestionCitas() {
                                 ❌ Cancelar
                               </button>
                             )}
-
                           </div>
                         </td>
                       </tr>
@@ -235,7 +227,6 @@ export default function GestionCitas() {
                   </tbody>
                 </table>
               )}
-
               {!cargando && citasFiltradas.length === 0 && (
                 <p className="text-center text-gray-400 py-8">
                   No hay citas {filtroEstado !== 'todas' ? `con estado "${filtroEstado}"` : ''}
@@ -243,12 +234,9 @@ export default function GestionCitas() {
               )}
             </div>
 
-            <p className="text-sm text-gray-400 mt-3">
-              Total: {citasFiltradas.length} cita(s)
-            </p>
+            <p className="text-sm text-gray-400 mt-3">Total: {citasFiltradas.length} cita(s)</p>
           </>
         )}
-
       </div>
     </div>
   )
