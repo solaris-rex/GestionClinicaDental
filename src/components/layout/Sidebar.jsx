@@ -1,8 +1,6 @@
-// src/components/layout/Sidebar.jsx
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { supabase } from '../../lib/supabase'
 
 const MENUS = {
   publico: [
@@ -34,11 +32,9 @@ const ROLES_FIJOS = ['administrador', 'recepcionista', 'odontologo']
 
 export default function Sidebar({ rol = 'publico' }) {
   const [abierto, setAbierto] = useState(false)
-  const [subiendoFoto, setSubiendoFoto] = useState(false)
   const { perfil, cerrarSesion } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const inputFoto = useRef(null)
 
   const esPublico = rol === 'publico'
   const esFijo = ROLES_FIJOS.includes(rol)
@@ -46,24 +42,6 @@ export default function Sidebar({ rol = 'publico' }) {
   const menuPublico = MENUS.publico
   const menuPersonal = perfil?.rol ? MENUS[perfil.rol] : null
   const menu = esFijo ? (MENUS[rol] || []) : (MENUS[rol] || MENUS.publico)
-
-  async function handleSubirFoto(e) {
-    const archivo = e.target.files[0]
-    if (!archivo || !perfil?.id) return
-    setSubiendoFoto(true)
-    try {
-      const extension = archivo.name.split('.').pop()
-      const nombreArchivo = `${perfil.id}.${extension}`
-      await supabase.storage.from('avatars').upload(nombreArchivo, archivo, { upsert: true })
-      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(nombreArchivo)
-      await supabase.from('perfiles').update({ avatar_url: urlData.publicUrl }).eq('id', perfil.id)
-      window.location.reload()
-    } catch (err) {
-      console.error('Error subiendo foto:', err)
-    } finally {
-      setSubiendoFoto(false)
-    }
-  }
 
   function handleNavegar(item) {
     if (item.href) {
@@ -119,7 +97,6 @@ export default function Sidebar({ rol = 'publico' }) {
           )}
         </div>
 
-        {/* Menú SIN botón Inicio */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {menu.map((item) => (
             <button key={item.label} onClick={() => handleNavegar(item)}
@@ -134,7 +111,7 @@ export default function Sidebar({ rol = 'publico' }) {
 
         <div className="border-t border-gray-700 p-4">
           <div className="flex items-center gap-3 mb-3">
-            <div className="relative">
+            <div>
               {perfil?.avatar_url ? (
                 <img src={perfil.avatar_url} alt="Avatar"
                   className="w-10 h-10 rounded-full object-cover border-2 border-teal-500" />
@@ -143,10 +120,6 @@ export default function Sidebar({ rol = 'publico' }) {
                   {perfil?.nombre?.charAt(0)}{perfil?.apellido?.charAt(0)}
                 </div>
               )}
-              <button onClick={() => inputFoto.current?.click()}
-                className="absolute -bottom-0.5 -right-0.5 bg-gray-700 hover:bg-teal-600 rounded-full w-4 h-4 flex items-center justify-center text-xs transition"
-                title="Cambiar foto">📷</button>
-              <input type="file" ref={inputFoto} onChange={handleSubirFoto} accept="image/*" className="hidden" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white font-semibold text-sm truncate">{perfil?.nombre} {perfil?.apellido}</p>
@@ -163,7 +136,6 @@ export default function Sidebar({ rol = 'publico' }) {
               <span>🚪</span><span>Cerrar sesión</span>
             </button>
           </div>
-          {subiendoFoto && <p className="text-xs text-teal-400 text-center mt-2 animate-pulse">Subiendo foto...</p>}
         </div>
       </div>
     )
@@ -176,7 +148,7 @@ export default function Sidebar({ rol = 'publico' }) {
     <>
       <button
         onClick={() => setAbierto(!abierto)}
-        className="fixed top-4 left-4 z-50 bg-white shadow-lg rounded-xl w-10 h-10 flex flex-col items-center justify-center gap-1.5 hover:bg-gray-50 transition"
+        className="fixed top-3 left-4 z-50 bg-white shadow-lg rounded-xl w-10 h-10 flex flex-col items-center justify-center gap-1.5 hover:bg-gray-0 transition"
       >
         <span className="w-5 h-0.5 bg-gray-700 block" />
         <span className="w-5 h-0.5 bg-gray-700 block" />
@@ -255,7 +227,7 @@ export default function Sidebar({ rol = 'publico' }) {
           {perfil ? (
             <div>
               <div className="flex items-center gap-3 mb-3">
-                <div className="relative">
+                <div>
                   {perfil.avatar_url ? (
                     <img src={perfil.avatar_url} alt="Avatar"
                       className="w-10 h-10 rounded-full object-cover border-2 border-teal-500" />
@@ -264,11 +236,6 @@ export default function Sidebar({ rol = 'publico' }) {
                       {perfil.nombre?.charAt(0)}{perfil.apellido?.charAt(0)}
                     </div>
                   )}
-                  <button onClick={() => inputFoto.current?.click()}
-                    className="absolute -bottom-0.5 -right-0.5 bg-gray-700 hover:bg-teal-600 rounded-full w-4 h-4 flex items-center justify-center text-xs transition">
-                    📷
-                  </button>
-                  <input type="file" ref={inputFoto} onChange={handleSubirFoto} accept="image/*" className="hidden" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-white font-semibold text-sm truncate">{perfil.nombre} {perfil.apellido}</p>
@@ -292,7 +259,6 @@ export default function Sidebar({ rol = 'publico' }) {
               <span>🔐</span><span>Iniciar sesión</span>
             </button>
           )}
-          {subiendoFoto && <p className="text-xs text-teal-400 text-center mt-2 animate-pulse">Subiendo foto...</p>}
         </div>
       </div>
     </>

@@ -1,9 +1,6 @@
 // src/services/citasService.js
-// Contiene todas las operaciones de la tabla 'citas' en Supabase.
-
 import { supabase } from '../lib/supabase'
 
-// Obtener todas las citas con datos del paciente y odontólogo
 export async function obtenerCitas() {
   const { data, error } = await supabase
     .from('citas')
@@ -17,7 +14,6 @@ export async function obtenerCitas() {
   return { data, error }
 }
 
-// Obtener citas de un odontólogo específico
 export async function obtenerCitasPorOdontologo(odontologoId) {
   const { data, error } = await supabase
     .from('citas')
@@ -32,7 +28,6 @@ export async function obtenerCitasPorOdontologo(odontologoId) {
   return { data, error }
 }
 
-// Verificar si ya existe una cita en esa fecha y hora para ese odontólogo
 export async function verificarDisponibilidad(odontologoId, fecha, hora, citaIdExcluir = null) {
   let query = supabase
     .from('citas')
@@ -40,7 +35,7 @@ export async function verificarDisponibilidad(odontologoId, fecha, hora, citaIdE
     .eq('odontologo_id', odontologoId)
     .eq('fecha', fecha)
     .eq('hora', hora)
-    .neq('estado', 'cancelada') // las canceladas no bloquean el horario
+    .neq('estado', 'cancelada')
 
   if (citaIdExcluir) {
     query = query.neq('id', citaIdExcluir)
@@ -50,7 +45,33 @@ export async function verificarDisponibilidad(odontologoId, fecha, hora, citaIdE
   return { disponible: data?.length === 0, error }
 }
 
-// Crear una nueva cita
+// NUEVA: obtener odontólogos disponibles en una fecha y hora específica
+export async function obtenerOdontologosDisponibles(fecha, hora) {
+  // 1. Obtener todos los odontólogos
+  const { data: todos, error: errorTodos } = await supabase
+    .from('perfiles')
+    .select('id, nombre, apellido')
+    .eq('rol', 'odontologo')
+
+  if (errorTodos || !todos) return { data: [], error: errorTodos }
+
+  // 2. Obtener los que ya tienen cita en esa fecha y hora
+  const { data: ocupados, error: errorOcupados } = await supabase
+    .from('citas')
+    .select('odontologo_id')
+    .eq('fecha', fecha)
+    .eq('hora', hora + ':00')
+    .neq('estado', 'cancelada')
+
+  if (errorOcupados) return { data: [], error: errorOcupados }
+
+  // 3. Filtrar — quedarse solo con los que NO están ocupados
+  const idsOcupados = (ocupados || []).map(c => c.odontologo_id)
+  const disponibles = todos.filter(d => !idsOcupados.includes(d.id))
+
+  return { data: disponibles, error: null }
+}
+
 export async function crearCita(cita) {
   const { data, error } = await supabase
     .from('citas')
@@ -60,7 +81,6 @@ export async function crearCita(cita) {
   return { data, error }
 }
 
-// Actualizar estado de una cita
 export async function actualizarEstadoCita(id, estado, notas = null) {
   const cambios = { estado }
   if (notas !== null) cambios.notas = notas
@@ -74,7 +94,6 @@ export async function actualizarEstadoCita(id, estado, notas = null) {
   return { data, error }
 }
 
-// Reprogramar una cita (cambiar fecha y hora)
 export async function reprogramarCita(id, fecha, hora) {
   const { data, error } = await supabase
     .from('citas')
@@ -85,7 +104,6 @@ export async function reprogramarCita(id, fecha, hora) {
   return { data, error }
 }
 
-// Obtener odontólogos disponibles (para el selector del formulario)
 export async function obtenerOdontologos() {
   const { data, error } = await supabase
     .from('perfiles')

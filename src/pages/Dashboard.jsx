@@ -8,12 +8,20 @@ export default function Dashboard() {
   const navigate = useNavigate()
 
   useEffect(() => {
+    // Esperar a que termine de cargar
     if (cargando) return
 
-    if (perfil?.rol === 'administrador') navigate('/admin')
-    else if (perfil?.rol === 'recepcionista') navigate('/recepcionista')
-    else if (perfil?.rol === 'odontologo') navigate('/odontologo')
-    else if (perfil?.rol === 'paciente') navigate('/')  // ← Landing page
+    // Si no hay perfil después de cargar, ir al login
+    if (!perfil) {
+      navigate('/login')
+      return
+    }
+
+    if (perfil.rol === 'administrador') navigate('/admin')
+    else if (perfil.rol === 'recepcionista') navigate('/recepcionista')
+    else if (perfil.rol === 'odontologo') navigate('/odontologo')
+    else if (perfil.rol === 'paciente') navigate('/')
+    else navigate('/login') // rol desconocido
   }, [perfil, cargando])
 
   return (

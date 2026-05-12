@@ -1,3 +1,4 @@
+// src/context/AuthContext.jsx
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
@@ -16,32 +17,54 @@ export function AuthProvider({ children }) {
   const [perfil, setPerfil] = useState(null)
   const [cargando, setCargando] = useState(true)
   const cargandoPerfil = useRef(false)
+  const inicializado = useRef(false)
 
   useEffect(() => {
     let montado = true
 
+    const timeoutSeguridad = setTimeout(() => {
+      if (montado) setCargando(false)
+    }, 5000)
+
     async function inicializar() {
       try {
-        const timeoutId = setTimeout(() => {
-          if (montado) {
-            limpiarTokenSucio()
-            setUsuario(null)
-            setPerfil(null)
-            setCargando(false)
-            window.location.href = '/login'
-          }
-        }, 8000)
-
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession()
-
-        clearTimeout(timeoutId)
-
+        const { data: { session }, error } = await supabase.auth.getSession()
+        clearTimeout(timeoutSeguridad)
         if (!montado) return
 
-        if (error) {
+        if (error || !session?.user) {
+          if (error) limpiarTokenSucio()
+          setUsuario(null)
+          setPerfil(null)
+          setCargando(false)
+          inicializado.current = true
+          return
+        }
+
+        setUsuario(session.user)
+        await cargarPerfil(session.user.id, montado)
+        inicializado.current = true
+      } catch {
+        clearTimeout(timeoutSeguridad)
+        if (montado) {
+          setUsuario(null)
+          setPerfil(null)
+          setCargando(false)
+          inicializado.current = true
+        }
+      }
+    }
+
+    inicializar()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!montado) return
+
+        // Ignorar eventos hasta que la inicialización termine
+        if (!inicializado.current) return
+
+        if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
           limpiarTokenSucio()
           setUsuario(null)
           setPerfil(null)
@@ -49,53 +72,23 @@ export function AuthProvider({ children }) {
           return
         }
 
-        if (session?.user) {
+        if (event === 'SIGNED_IN' && session?.user) {
           setUsuario(session.user)
           await cargarPerfil(session.user.id, montado)
-        } else {
-          setUsuario(null)
-          setPerfil(null)
-          setCargando(false)
+          return
         }
-      } catch (err) {
-        limpiarTokenSucio()
 
-        if (montado) {
+        if (!session?.user) {
           setUsuario(null)
           setPerfil(null)
           setCargando(false)
         }
       }
-    }
-
-    inicializar()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!montado) return
-
-      if (event === 'TOKEN_REFRESHED' && !session) {
-        limpiarTokenSucio()
-        setUsuario(null)
-        setPerfil(null)
-        setCargando(false)
-        window.location.href = '/login'
-        return
-      }
-
-      if (session?.user) {
-        setUsuario(session.user)
-        await cargarPerfil(session.user.id, montado)
-      } else {
-        setUsuario(null)
-        setPerfil(null)
-        setCargando(false)
-      }
-    })
+    )
 
     return () => {
       montado = false
+      clearTimeout(timeoutSeguridad)
       subscription.unsubscribe()
     }
   }, [])
@@ -105,7 +98,6 @@ export function AuthProvider({ children }) {
     cargandoPerfil.current = true
 
     try {
-      // maybeSingle evita error 406
       const { data, error } = await supabase
         .from('perfiles')
         .select('*')
@@ -115,32 +107,20 @@ export function AuthProvider({ children }) {
       if (!montado) return
 
       if (data) {
-        // Perfil encontrado
         setPerfil(data)
         setCargando(false)
       } else if (intentos < 3) {
-        // Reintentar si el perfil aún no aparece
         cargandoPerfil.current = false
-
-        setTimeout(() => {
-          cargarPerfil(userId, montado, intentos + 1)
-        }, 1000)
+        setTimeout(() => cargarPerfil(userId, montado, intentos + 1), 1000)
       } else {
-        // Si después de 3 intentos no existe perfil
-        limpiarTokenSucio()
         setUsuario(null)
         setPerfil(null)
         setCargando(false)
-        window.location.href = '/login'
       }
-    } catch (err) {
-      limpiarTokenSucio()
-
+    } catch {
       if (montado) {
-        setUsuario(null)
         setPerfil(null)
         setCargando(false)
-        window.location.href = '/login'
       }
     } finally {
       cargandoPerfil.current = false
@@ -148,28 +128,16 @@ export function AuthProvider({ children }) {
   }
 
   async function cerrarSesion() {
-    // Limpiar inmediatamente
     limpiarTokenSucio()
     setUsuario(null)
     setPerfil(null)
     setCargando(false)
-
-    // Redirigir de inmediato
     window.location.href = '/login'
-
-    // Cerrar sesión en segundo plano (no bloqueante)
     supabase.auth.signOut().catch(() => {})
   }
 
-  const valor = {
-    usuario,
-    perfil,
-    cargando,
-    cerrarSesion,
-  }
-
   return (
-    <AuthContext.Provider value={valor}>
+    <AuthContext.Provider value={{ usuario, perfil, cargando, cerrarSesion }}>
       {children}
     </AuthContext.Provider>
   )

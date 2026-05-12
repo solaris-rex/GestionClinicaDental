@@ -1,10 +1,7 @@
 // src/components/citas/FormularioCita.jsx
-// Formulario para programar o reprogramar una cita.
-// Valida disponibilidad antes de guardar.
-
 import { useState, useEffect } from 'react'
-import { obtenerOdontologos, verificarDisponibilidad } from '../../services/citasService'
-import { obtenerPacientes, buscarPacientes } from '../../services/pacientesService'
+import { obtenerOdontologosDisponibles, verificarDisponibilidad } from '../../services/citasService'
+import { buscarPacientes } from '../../services/pacientesService'
 
 const HORAS_DISPONIBLES = [
   '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
@@ -22,75 +19,93 @@ const FORM_VACIO = {
 
 export default function FormularioCita({ citaInicial, onGuardar, onCancelar }) {
   const [form, setForm] = useState(citaInicial || FORM_VACIO)
-  const [odontologos, setOdontologos] = useState([])
+  const [odontologosDisponibles, setOdontologosDisponibles] = useState([])
   const [pacientes, setPacientes] = useState([])
   const [busquedaPaciente, setBusquedaPaciente] = useState('')
-  const [disponibilidad, setDisponibilidad] = useState(null)
+  const [buscandoOdontologos, setBuscandoOdontologos] = useState(false)
+  const [sinOdontologos, setSinOdontologos] = useState(false)
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
 
+  // Si hay citaInicial (reprogramar), cargar odontólogos disponibles para esa fecha/hora
   useEffect(() => {
-    cargarDatos()
+    if (citaInicial?.fecha && citaInicial?.hora) {
+      buscarOdontologosDisponibles(citaInicial.fecha, citaInicial.hora)
+    }
   }, [])
 
-  async function cargarDatos() {
-    const [{ data: docs }, { data: pacs }] = await Promise.all([
-      obtenerOdontologos(),
-      obtenerPacientes(),
-    ])
-    setOdontologos(docs || [])
-    setPacientes(pacs || [])
-  }
-
   async function handleBusquedaPaciente(e) {
-  const termino = e.target.value
-  setBusquedaPaciente(termino)
-
-  // Limpiar paciente seleccionado si el usuario está escribiendo de nuevo
-  setForm(prev => ({ ...prev, paciente_id: '' }))
-
-  // Solo buscar si hay al menos 1 carácter
-  if (termino.trim() === '') {
-    setPacientes([]) // limpiar lista cuando está vacío
-    return
+    const termino = e.target.value
+    setBusquedaPaciente(termino)
+    setForm(prev => ({ ...prev, paciente_id: '' }))
+    if (termino.trim() === '') {
+      setPacientes([])
+      return
+    }
+    const { data } = await buscarPacientes(termino)
+    setPacientes(data || [])
   }
 
-  const { data } = await buscarPacientes(termino)
-  setPacientes(data || [])
-}
+  async function buscarOdontologosDisponibles(fecha, hora) {
+    if (!fecha || !hora) return
+    setBuscandoOdontologos(true)
+    setSinOdontologos(false)
+    setOdontologosDisponibles([])
+    setForm(prev => ({ ...prev, odontologo_id: '' }))
 
-  // Verificar disponibilidad cuando cambian odontólogo, fecha u hora
-  async function verificar(nuevoForm) {
-    if (nuevoForm.odontologo_id && nuevoForm.fecha && nuevoForm.hora) {
-      const { disponible } = await verificarDisponibilidad(
-        nuevoForm.odontologo_id,
-        nuevoForm.fecha,
-        nuevoForm.hora + ':00',
-        citaInicial?.id
-      )
-      setDisponibilidad(disponible)
-    } else {
-      setDisponibilidad(null)
-    }
+    const { data } = await obtenerOdontologosDisponibles(fecha, hora)
+    setOdontologosDisponibles(data || [])
+    setSinOdontologos((data || []).length === 0)
+    setBuscandoOdontologos(false)
   }
 
   function handleChange(e) {
-    const nuevoForm = { ...form, [e.target.name]: e.target.value }
+    const { name, value } = e.target
+    const nuevoForm = { ...form, [name]: value }
     setForm(nuevoForm)
-    verificar(nuevoForm)
+
+    // Buscar odontólogos disponibles cuando cambia fecha u hora
+    if (name === 'fecha' || name === 'hora') {
+      const fecha = name === 'fecha' ? value : nuevoForm.fecha
+      const hora = name === 'hora' ? value : nuevoForm.hora
+      if (fecha && hora) {
+        buscarOdontologosDisponibles(fecha, hora)
+      } else {
+        // Limpiar si falta fecha u hora
+        setOdontologosDisponibles([])
+        setSinOdontologos(false)
+        setForm(prev => ({ ...prev, [name]: value, odontologo_id: '' }))
+      }
+    }
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
 
-    if (disponibilidad === false) {
-      setError('El odontólogo ya tiene una cita en ese horario.')
+    if (!form.paciente_id) {
+      setError('Debes seleccionar un paciente.')
+      return
+    }
+    if (!form.odontologo_id) {
+      setError('Debes seleccionar un odontólogo.')
+      return
+    }
+
+    // Doble verificación de disponibilidad al guardar
+    const { disponible } = await verificarDisponibilidad(
+      form.odontologo_id,
+      form.fecha,
+      form.hora + ':00',
+      citaInicial?.id
+    )
+    if (!disponible) {
+      setError('El odontólogo ya no está disponible en ese horario. Por favor elige otro.')
+      await buscarOdontologosDisponibles(form.fecha, form.hora)
       return
     }
 
     setCargando(true)
-
     const timeout = setTimeout(() => {
       setCargando(false)
       setError('La operación tardó demasiado. Intenta de nuevo.')
@@ -102,7 +117,6 @@ export default function FormularioCita({ citaInicial, onGuardar, onCancelar }) {
         hora: form.hora + ':00',
       })
       clearTimeout(timeout)
-
       if (resultado?.error) {
         setError('Error al guardar la cita: ' + resultado.error.message)
         setCargando(false)
@@ -114,8 +128,8 @@ export default function FormularioCita({ citaInicial, onGuardar, onCancelar }) {
     }
   }
 
-  // Fecha mínima: hoy
   const hoy = new Date().toISOString().split('T')[0]
+  const puedeGuardar = form.paciente_id && form.fecha && form.hora && form.odontologo_id
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -125,80 +139,47 @@ export default function FormularioCita({ citaInicial, onGuardar, onCancelar }) {
         </div>
       )}
 
-      {/* Buscar y seleccionar paciente - versión mejorada */}
-<div>
-  <label className="block text-sm font-medium text-gray-700 mb-1">
-    Paciente <span className="text-red-500">*</span>
-  </label>
-  <input
-    type="text"
-    value={busquedaPaciente}
-    onChange={handleBusquedaPaciente}
-    placeholder="🔍 Buscar paciente por nombre o DNI..."
-    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-  />
-
-  {/* Lista de resultados — solo aparece cuando hay texto */}
-  {busquedaPaciente.trim() !== '' && (
-    <div className="border border-gray-200 rounded-lg mt-1 max-h-40 overflow-y-auto shadow-sm bg-white">
-      {pacientes.length === 0 ? (
-        <p className="text-sm text-gray-400 px-3 py-2">
-          No se encontraron pacientes
-        </p>
-      ) : (
-        pacientes.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => {
-              setForm({ ...form, paciente_id: p.id })
-              setBusquedaPaciente(`${p.apellido}, ${p.nombre} — DNI: ${p.dni}`)
-            }}
-            className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 border-b border-gray-100 last:border-0"
-          >
-            <span className="font-medium text-gray-800">
-              {p.apellido}, {p.nombre}
-            </span>
-            <span className="text-gray-400 ml-2">DNI: {p.dni}</span>
-          </button>
-        ))
-      )}
-    </div>
-  )}
-
-  {/* Paciente seleccionado */}
-  {form.paciente_id && busquedaPaciente.trim() !== '' && (
-    <p className="text-xs text-green-600 mt-1 font-medium">
-      ✅ Paciente seleccionado
-    </p>
-  )}
-
-  {/* Input oculto para validación del formulario */}
-  <input type="hidden" name="paciente_id" value={form.paciente_id} required />
-</div>
-
-      {/* Odontólogo */}
+      {/* Paciente */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Odontólogo <span className="text-red-500">*</span>
+          Paciente <span className="text-red-500">*</span>
         </label>
-        <select
-          name="odontologo_id"
-          value={form.odontologo_id}
-          onChange={handleChange}
-          required
+        <input
+          type="text"
+          value={busquedaPaciente}
+          onChange={handleBusquedaPaciente}
+          placeholder="🔍 Buscar paciente por nombre o DNI..."
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-        >
-          <option value="">Seleccione un odontólogo</option>
-          {odontologos.map((d) => (
-            <option key={d.id} value={d.id}>
-              Dr. {d.nombre} {d.apellido}
-            </option>
-          ))}
-        </select>
+        />
+        {busquedaPaciente.trim() !== '' && (
+          <div className="border border-gray-200 rounded-lg mt-1 max-h-40 overflow-y-auto shadow-sm bg-white">
+            {pacientes.length === 0 ? (
+              <p className="text-sm text-gray-400 px-3 py-2">No se encontraron pacientes</p>
+            ) : (
+              pacientes.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    setForm({ ...form, paciente_id: p.id })
+                    setBusquedaPaciente(`${p.apellido}, ${p.nombre} — DNI: ${p.dni}`)
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 border-b border-gray-100 last:border-0"
+                >
+                  <span className="font-medium text-gray-800">{p.apellido}, {p.nombre}</span>
+                  <span className="text-gray-400 ml-2">DNI: {p.dni}</span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+        {form.paciente_id && busquedaPaciente.trim() !== '' && (
+          <p className="text-xs text-green-600 mt-1 font-medium">✅ Paciente seleccionado</p>
+        )}
+        <input type="hidden" name="paciente_id" value={form.paciente_id} required />
       </div>
 
-      {/* Fecha y Hora */}
+      {/* Fecha y Hora — primero */}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -233,16 +214,37 @@ export default function FormularioCita({ citaInicial, onGuardar, onCancelar }) {
         </div>
       </div>
 
-      {/* Indicador de disponibilidad */}
-      {disponibilidad !== null && (
-        <div className={`px-4 py-2 rounded-lg text-sm font-medium ${
-          disponibilidad
-            ? 'bg-green-100 text-green-700'
-            : 'bg-red-100 text-red-700'
-        }`}>
-          {disponibilidad
-            ? '✅ Horario disponible'
-            : '❌ Horario ocupado — elige otro'}
+      {/* Odontólogo — aparece después de elegir fecha y hora */}
+      {(form.fecha && form.hora) && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Odontólogo disponible <span className="text-red-500">*</span>
+          </label>
+
+          {buscandoOdontologos ? (
+            <div className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400 bg-gray-50">
+              🔍 Buscando odontólogos disponibles...
+            </div>
+          ) : sinOdontologos ? (
+            <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-lg text-sm">
+              ⚠️ No hay odontólogos disponibles en ese horario. Por favor elige otra fecha u hora.
+            </div>
+          ) : (
+            <select
+              name="odontologo_id"
+              value={form.odontologo_id}
+              onChange={handleChange}
+              required
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+            >
+              <option value="">Seleccione un odontólogo</option>
+              {odontologosDisponibles.map((d) => (
+                <option key={d.id} value={d.id}>
+                  Dr. {d.nombre} {d.apellido}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       )}
 
@@ -265,7 +267,7 @@ export default function FormularioCita({ citaInicial, onGuardar, onCancelar }) {
       <div className="flex gap-3 pt-2">
         <button
           type="submit"
-          disabled={cargando || disponibilidad === false}
+          disabled={cargando || !puedeGuardar || sinOdontologos}
           className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg transition disabled:opacity-50"
         >
           {cargando ? 'Guardando...' : 'Guardar cita'}

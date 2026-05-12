@@ -124,13 +124,6 @@ export default function PanelAdmin() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/perfil')}
-              className="text-gray-400 hover:text-gray-600 transition text-lg"
-              title="Editar perfil"
-            >
-              ⚙️
-            </button>
             {perfil?.avatar_url ? (
               <img src={perfil.avatar_url} alt="Avatar" className="w-9 h-9 rounded-full object-cover border-2 border-purple-500" />
             ) : (
@@ -138,18 +131,16 @@ export default function PanelAdmin() {
                 {perfil?.nombre?.charAt(0)}{perfil?.apellido?.charAt(0)}
               </div>
             )}
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-gray-800">¡Hola, {perfil?.nombre}! 👋</p>
-                <button
-                  onClick={cerrarSesion}
-                  className="text-xs text-red-500 hover:text-red-700 transition font-medium"
-                >
-                  Cerrar sesión
-                </button>
-              </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-gray-800">¡Hola, {perfil?.nombre}! 👋</p>
               <p className="text-xs text-gray-400 capitalize">{perfil?.rol}</p>
             </div>
+            <button
+              onClick={cerrarSesion}
+              className="border border-red-400 text-red-500 hover:bg-red-50 hover:border-red-500 text-xs font-medium px-3 py-1.5 rounded-lg transition"
+            >
+              Cerrar sesión
+            </button>
           </div>
         </div>
 

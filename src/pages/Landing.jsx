@@ -24,15 +24,15 @@ export default function Landing() {
 
       {/* ===== NAVBAR ===== */}
       <nav className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-6 py-3 flex justify-between items-center">
+        <div className="w-full px-6 py-3 flex justify-between items-center">
 
-          {/* Logo con margen para hamburguesa */}
-          <div className="flex items-center gap-2 ml-12">
+          {/* Logo — siempre con espacio para el burger menu */}
+          <div className="flex items-center gap-2 ml-10">
             <span className="text-2xl">🦷</span>
             <span className="text-xl font-bold text-teal-700">DentaNovax</span>
           </div>
 
-          {/* Saludo o botón login */}
+          {/* Derecha: sesión o botón login */}
           <div className="flex items-center gap-3">
             {cargando ? (
               <div className="w-48 h-10 bg-gray-100 rounded-lg animate-pulse" />
@@ -51,7 +51,7 @@ export default function Landing() {
                   </div>
                 )}
                 {/* Saludo con fecha */}
-                <div className="text-right">
+                <div className="text-left">
                   <p className="text-sm font-semibold text-gray-800">
                     ¡Hola, {perfil.nombre}! 👋
                   </p>
@@ -64,6 +64,13 @@ export default function Landing() {
                     })}
                   </p>
                 </div>
+                {/* Cerrar sesión — igual que en EditarPerfil */}
+                <button
+                  onClick={cerrarSesion}
+                  className="border border-red-400 text-red-500 hover:bg-red-50 hover:border-red-500 text-xs font-medium px-3 py-1.5 rounded-lg transition"
+                >
+                  Cerrar sesión
+                </button>
               </div>
             ) : (
               <button
