@@ -1,6 +1,6 @@
 // src/pages/recepcionista/GestionCitas.jsx
 import { useEffect, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/layout/Sidebar'
 import FormularioCita from '../../components/citas/FormularioCita'
@@ -13,24 +13,27 @@ import {
 
 const COLORES_ESTADO = {
   programada: 'bg-blue-100 text-blue-700',
-  confirmada: 'bg-green-100 text-green-700',
   cancelada: 'bg-red-100 text-red-700',
   completada: 'bg-gray-100 text-gray-600',
 }
 
 export default function GestionCitas() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { perfil } = useAuth()
   const [citas, setCitas] = useState([])
   const [cargando, setCargando] = useState(true)
   const [vista, setVista] = useState('lista')
   const [citaSeleccionada, setCitaSeleccionada] = useState(null)
   const [filtroEstado, setFiltroEstado] = useState('todas')
+  const [busqueda, setBusqueda] = useState('')
 
-  useEffect(() => { cargarCitas() }, [])
+  useEffect(() => {
+    cargarCitas()
+    // Auto-completar citas cuya hora ya pasó
+    const intervalo = setInterval(completarCitasPasadas, 60000)
+    return () => clearInterval(intervalo)
+  }, [])
 
-  // Determinar a dónde volver según el rol o el state
   function getRutaVolver() {
     if (perfil?.rol === 'administrador') return '/admin'
     return '/recepcionista'
@@ -39,8 +42,38 @@ export default function GestionCitas() {
   async function cargarCitas() {
     setCargando(true)
     const { data } = await obtenerCitas()
-    setCitas(data || [])
+    const citasData = data || []
+    setCitas(citasData)
     setCargando(false)
+    // Completar automáticamente al cargar
+    await completarCitasPasadasDesdeLista(citasData)
+  }
+
+  async function completarCitasPasadasDesdeLista(listaCitas) {
+    const ahora = new Date()
+    const hoy = ahora.toISOString().split('T')[0]
+    const horaActual = ahora.toTimeString().slice(0, 5)
+
+    const paraCompletar = listaCitas.filter(c => {
+      if (c.estado !== 'programada') return false
+      if (c.fecha < hoy) return true
+      if (c.fecha === hoy && c.hora?.slice(0, 5) < horaActual) return true
+      return false
+    })
+
+    for (const cita of paraCompletar) {
+      await actualizarEstadoCita(cita.id, 'completada')
+    }
+
+    if (paraCompletar.length > 0) {
+      const { data } = await obtenerCitas()
+      setCitas(data || [])
+    }
+  }
+
+  async function completarCitasPasadas() {
+    const { data } = await obtenerCitas()
+    if (data) await completarCitasPasadasDesdeLista(data)
   }
 
   async function handleGuardarNueva(form) {
@@ -65,15 +98,21 @@ export default function GestionCitas() {
     return resultado
   }
 
-  async function handleCambiarEstado(id, nuevoEstado) {
-    await actualizarEstadoCita(id, nuevoEstado)
+  async function handleCancelar(id) {
+    await actualizarEstadoCita(id, 'cancelada')
     await cargarCitas()
   }
 
-  const citasFiltradas =
-    filtroEstado === 'todas'
-      ? citas
-      : citas.filter((c) => c.estado === filtroEstado)
+  // Filtrar por estado y búsqueda
+  const citasFiltradas = citas
+    .filter(c => filtroEstado === 'todas' || c.estado === filtroEstado)
+    .filter(c => {
+      if (!busqueda.trim()) return true
+      const termino = busqueda.toLowerCase()
+      const nombre = `${c.paciente?.nombre} ${c.paciente?.apellido}`.toLowerCase()
+      const dni = c.paciente?.dni?.toLowerCase() || ''
+      return nombre.includes(termino) || dni.includes(termino)
+    })
 
   function formatearFecha(fecha) {
     if (!fecha) return '—'
@@ -122,7 +161,7 @@ export default function GestionCitas() {
         {vista === 'reprogramar' && citaSeleccionada && (
           <div className="bg-white rounded-2xl shadow p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Reprogramar cita — {citaSeleccionada.paciente?.nombre} {citaSeleccionada.paciente?.apellido}
+              Reprogramar — {citaSeleccionada.paciente?.nombre} {citaSeleccionada.paciente?.apellido}
             </h3>
             <FormularioCita
               citaInicial={{
@@ -140,8 +179,20 @@ export default function GestionCitas() {
 
         {vista === 'lista' && (
           <>
+            {/* Buscador */}
+            <div className="mb-4">
+              <input
+                type="text"
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                placeholder="🔍 Buscar por nombre o DNI del paciente..."
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
+              />
+            </div>
+
+            {/* Filtros de estado */}
             <div className="flex gap-2 mb-4 flex-wrap">
-              {['todas', 'programada', 'confirmada', 'cancelada', 'completada'].map((estado) => (
+              {['todas', 'programada', 'completada', 'cancelada'].map((estado) => (
                 <button
                   key={estado}
                   onClick={() => setFiltroEstado(estado)}
@@ -168,6 +219,7 @@ export default function GestionCitas() {
                       <th className="text-left px-4 py-3 text-gray-600">Fecha</th>
                       <th className="text-left px-4 py-3 text-gray-600">Hora</th>
                       <th className="text-left px-4 py-3 text-gray-600">Estado</th>
+                      <th className="text-left px-4 py-3 text-gray-600">Pago</th>
                       <th className="text-left px-4 py-3 text-gray-600">Acciones</th>
                     </tr>
                   </thead>
@@ -178,47 +230,43 @@ export default function GestionCitas() {
                           <p className="font-medium text-gray-800">{c.paciente?.apellido}, {c.paciente?.nombre}</p>
                           <p className="text-xs text-gray-400">DNI: {c.paciente?.dni}</p>
                         </td>
-                        <td className="px-4 py-3 text-gray-600">Dr. {c.odontologo?.nombre} {c.odontologo?.apellido}</td>
+                        <td className="px-4 py-3 text-gray-600">
+                          Dr. {c.odontologo?.nombre} {c.odontologo?.apellido}
+                        </td>
                         <td className="px-4 py-3 text-gray-600">{formatearFecha(c.fecha)}</td>
                         <td className="px-4 py-3 text-gray-600">{c.hora?.slice(0, 5)}</td>
                         <td className="px-4 py-3">
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${COLORES_ESTADO[c.estado]}`}>
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${COLORES_ESTADO[c.estado] || 'bg-gray-100 text-gray-600'}`}>
                             {c.estado}
                           </span>
                         </td>
                         <td className="px-4 py-3">
+                          {c.pagado ? (
+                            <span className="text-xs text-teal-600 font-medium">
+                              💳 S/ 20.00
+                              {c.reembolsado && <span className="ml-1 text-green-600">(reembolsado)</span>}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400">Presencial</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
                           <div className="flex gap-1 flex-wrap">
-                            {c.estado !== 'cancelada' && c.estado !== 'completada' && (
-                              <button
-                                onClick={() => { setCitaSeleccionada(c); setVista('reprogramar') }}
-                                className="bg-yellow-100 hover:bg-yellow-200 text-yellow-700 text-xs px-2 py-1 rounded-lg"
-                              >
-                                📅 Reprogramar
-                              </button>
-                            )}
                             {c.estado === 'programada' && (
-                              <button
-                                onClick={() => handleCambiarEstado(c.id, 'confirmada')}
-                                className="bg-green-100 hover:bg-green-200 text-green-700 text-xs px-2 py-1 rounded-lg"
-                              >
-                                ✅ Confirmar
-                              </button>
-                            )}
-                            {c.estado === 'confirmada' && (
-                              <button
-                                onClick={() => handleCambiarEstado(c.id, 'completada')}
-                                className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded-lg"
-                              >
-                                🏁 Completar
-                              </button>
-                            )}
-                            {c.estado !== 'cancelada' && c.estado !== 'completada' && (
-                              <button
-                                onClick={() => handleCambiarEstado(c.id, 'cancelada')}
-                                className="bg-red-100 hover:bg-red-200 text-red-700 text-xs px-2 py-1 rounded-lg"
-                              >
-                                ❌ Cancelar
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => { setCitaSeleccionada(c); setVista('reprogramar') }}
+                                  className="bg-yellow-100 hover:bg-yellow-200 text-yellow-700 text-xs px-2 py-1 rounded-lg"
+                                >
+                                  📅 Reprogramar
+                                </button>
+                                <button
+                                  onClick={() => handleCancelar(c.id)}
+                                  className="bg-red-100 hover:bg-red-200 text-red-700 text-xs px-2 py-1 rounded-lg"
+                                >
+                                  ❌ Cancelar
+                                </button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -230,6 +278,7 @@ export default function GestionCitas() {
               {!cargando && citasFiltradas.length === 0 && (
                 <p className="text-center text-gray-400 py-8">
                   No hay citas {filtroEstado !== 'todas' ? `con estado "${filtroEstado}"` : ''}
+                  {busqueda && ` para "${busqueda}"`}
                 </p>
               )}
             </div>

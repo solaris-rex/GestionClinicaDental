@@ -10,12 +10,17 @@ export default function EditarPerfil() {
   const navigate = useNavigate()
   const inputFoto = useRef(null)
 
+  const esPaciente = perfil?.rol === 'paciente'
+  const ROLES_FIJOS = ['administrador', 'recepcionista', 'odontologo']
+  const tieneSidebarFijo = ROLES_FIJOS.includes(perfil?.rol)
+
   const [form, setForm] = useState({
     nombre: perfil?.nombre || '',
     apellido: perfil?.apellido || '',
     telefono: perfil?.telefono || '',
   })
   const [passwordForm, setPasswordForm] = useState({
+    actual: '',
     nueva: '',
     confirmar: '',
   })
@@ -36,7 +41,6 @@ export default function EditarPerfil() {
     setPasswordForm({ ...passwordForm, [e.target.name]: e.target.value })
   }
 
-  // Guardar datos del perfil
   async function handleGuardarPerfil(e) {
     e.preventDefault()
     setError('')
@@ -50,11 +54,7 @@ export default function EditarPerfil() {
     setGuardando(true)
     const { error: err } = await supabase
       .from('perfiles')
-      .update({
-        nombre: form.nombre,
-        apellido: form.apellido,
-        telefono: form.telefono,
-      })
+      .update({ nombre: form.nombre, apellido: form.apellido, telefono: form.telefono })
       .eq('id', perfil.id)
 
     if (err) {
@@ -66,12 +66,15 @@ export default function EditarPerfil() {
     setGuardando(false)
   }
 
-  // Cambiar contraseña
   async function handleCambiarPassword(e) {
     e.preventDefault()
     setErrorPass('')
     setExitoPass('')
 
+    if (!passwordForm.actual) {
+      setErrorPass('Ingresa tu contraseña actual.')
+      return
+    }
     if (passwordForm.nueva.length < 8) {
       setErrorPass('La contraseña debe tener mínimo 8 caracteres.')
       return
@@ -94,6 +97,22 @@ export default function EditarPerfil() {
     }
 
     setGuardandoPass(true)
+
+    // Verificar contraseña actual re-autenticando
+    const { data: userData } = await supabase.auth.getUser()
+    const email = userData?.user?.email
+
+    const { error: loginError } = await supabase.auth.signInWithPassword({
+      email,
+      password: passwordForm.actual,
+    })
+
+    if (loginError) {
+      setErrorPass('La contraseña actual es incorrecta.')
+      setGuardandoPass(false)
+      return
+    }
+
     const { error: err } = await supabase.auth.updateUser({
       password: passwordForm.nueva,
     })
@@ -102,20 +121,18 @@ export default function EditarPerfil() {
       setErrorPass('Error al cambiar contraseña: ' + err.message)
     } else {
       setExitoPass('✅ Contraseña actualizada correctamente.')
-      setPasswordForm({ nueva: '', confirmar: '' })
+      setPasswordForm({ actual: '', nueva: '', confirmar: '' })
       setTimeout(() => setExitoPass(''), 3000)
     }
     setGuardandoPass(false)
   }
 
-  // Subir foto de perfil
   async function handleSubirFoto(e) {
     const archivo = e.target.files[0]
     if (!archivo || !perfil?.id) return
 
     setSubiendoFoto(true)
     try {
-      // Preview inmediato
       const reader = new FileReader()
       reader.onload = (ev) => setAvatarPreview(ev.target.result)
       reader.readAsDataURL(archivo)
@@ -133,10 +150,7 @@ export default function EditarPerfil() {
         .from('avatars')
         .getPublicUrl(nombreArchivo)
 
-      await supabase
-        .from('perfiles')
-        .update({ avatar_url: urlData.publicUrl })
-        .eq('id', perfil.id)
+      await supabase.from('perfiles').update({ avatar_url: urlData.publicUrl }).eq('id', perfil.id)
 
       setExito('✅ Foto actualizada correctamente.')
       setTimeout(() => setExito(''), 3000)
@@ -151,13 +165,13 @@ export default function EditarPerfil() {
     <div className="min-h-screen bg-gray-50 flex">
       <Sidebar rol={perfil?.rol || 'publico'} />
 
-      {/* Todo el contenido a la derecha del sidebar */}
-      <div className="flex-1 ml-64 flex flex-col min-h-screen">
+      {/* Contenido: con margen solo si sidebar es fijo */}
+      <div className={`flex-1 flex flex-col min-h-screen ${tieneSidebarFijo ? 'ml-64' : ''}`}>
 
         {/* Header */}
-        <nav className="bg-white shadow-sm sticky top-0 z-50">
+        <nav className="bg-white shadow-sm sticky top-0 z-40">
           <div className="px-8 py-3 flex justify-between items-center">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 ml-10">
               <span className="text-2xl">🦷</span>
               <span className="text-xl font-bold text-teal-700">DentaNovax</span>
             </div>
@@ -174,8 +188,7 @@ export default function EditarPerfil() {
                 <p className="text-sm font-semibold text-gray-800">¡Hola, {perfil?.nombre}! 👋</p>
                 <p className="text-xs text-gray-400">
                   {new Date().toLocaleDateString('es-PE', {
-                    weekday: 'long', year: 'numeric',
-                    month: 'long', day: 'numeric'
+                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
                   })}
                 </p>
               </div>
@@ -193,9 +206,7 @@ export default function EditarPerfil() {
         <div className="flex-1 px-8 py-8">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-gray-800">⚙️ Editar perfil</h1>
-            <p className="text-gray-500 text-sm mt-1">
-              Actualiza tu información personal y preferencias de cuenta
-            </p>
+            <p className="text-gray-500 text-sm mt-1">Actualiza tu información personal y preferencias de cuenta</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -283,6 +294,16 @@ export default function EditarPerfil() {
                   <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-xl text-sm mb-4">{exitoPass}</div>
                 )}
                 <form onSubmit={handleCambiarPassword} className="space-y-4">
+                  {/* Contraseña actual */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Contraseña actual <span className="text-red-500">*</span>
+                    </label>
+                    <input type="password" name="actual" value={passwordForm.actual}
+                      onChange={handleChangePass} required placeholder="Ingresa tu contraseña actual"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-gray-50" />
+                  </div>
+                  {/* Nueva contraseña */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Nueva contraseña</label>
                     <input type="password" name="nueva" value={passwordForm.nueva}
@@ -290,21 +311,20 @@ export default function EditarPerfil() {
                       className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-gray-50" />
                     {passwordForm.nueva && (
                       <div className="mt-2 space-y-1">
-                        <p className={`text-xs flex items-center gap-1 ${passwordForm.nueva.length >= 8 ? 'text-green-600' : 'text-red-500'}`}>
-                          {passwordForm.nueva.length >= 8 ? '✅' : '❌'} Mínimo 8 caracteres
-                        </p>
-                        <p className={`text-xs flex items-center gap-1 ${/[A-Z]/.test(passwordForm.nueva) ? 'text-green-600' : 'text-red-500'}`}>
-                          {/[A-Z]/.test(passwordForm.nueva) ? '✅' : '❌'} Al menos una mayúscula
-                        </p>
-                        <p className={`text-xs flex items-center gap-1 ${/\d.*\d/.test(passwordForm.nueva) ? 'text-green-600' : 'text-red-500'}`}>
-                          {/\d.*\d/.test(passwordForm.nueva) ? '✅' : '❌'} Al menos 2 números
-                        </p>
-                        <p className={`text-xs flex items-center gap-1 ${/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(passwordForm.nueva) ? 'text-green-600' : 'text-red-500'}`}>
-                          {/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(passwordForm.nueva) ? '✅' : '❌'} Al menos un carácter especial
-                        </p>
+                        {[
+                          [passwordForm.nueva.length >= 8, 'Mínimo 8 caracteres'],
+                          [/[A-Z]/.test(passwordForm.nueva), 'Al menos una mayúscula'],
+                          [/\d.*\d/.test(passwordForm.nueva), 'Al menos 2 números'],
+                          [/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(passwordForm.nueva), 'Al menos un carácter especial'],
+                        ].map(([ok, label]) => (
+                          <p key={label} className={`text-xs flex items-center gap-1 ${ok ? 'text-green-600' : 'text-red-500'}`}>
+                            {ok ? '✅' : '❌'} {label}
+                          </p>
+                        ))}
                       </div>
                     )}
                   </div>
+                  {/* Confirmar contraseña */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Confirmar contraseña</label>
                     <input type="password" name="confirmar" value={passwordForm.confirmar}
@@ -337,7 +357,6 @@ export default function EditarPerfil() {
             <p>© 2026 DentaNovax. Todos los derechos reservados.</p>
           </div>
         </footer>
-
       </div>
     </div>
   )
