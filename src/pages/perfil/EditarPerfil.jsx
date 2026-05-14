@@ -139,10 +139,13 @@ export default function EditarPerfil() {
 
       const extension = archivo.name.split('.').pop()
       const nombreArchivo = `${perfil.id}.${extension}`
+      console.log('Subiendo archivo:', nombreArchivo, 'tamaño:', archivo.size)
 
-      const { error: errorSubida } = await supabase.storage
+      const { data: uploadData, error: errorSubida } = await supabase.storage
         .from('avatars')
         .upload(nombreArchivo, archivo, { upsert: true })
+
+      console.log('Resultado subida:', uploadData, errorSubida)
 
       if (errorSubida) throw errorSubida
 
@@ -150,11 +153,19 @@ export default function EditarPerfil() {
         .from('avatars')
         .getPublicUrl(nombreArchivo)
 
-      await supabase.from('perfiles').update({ avatar_url: urlData.publicUrl }).eq('id', perfil.id)
+      console.log('URL pública:', urlData.publicUrl)
+
+      const { error: updateError } = await supabase
+        .from('perfiles')
+        .update({ avatar_url: urlData.publicUrl })
+        .eq('id', perfil.id)
+
+      console.log('Update perfil error:', updateError)
 
       setExito('✅ Foto actualizada correctamente.')
       setTimeout(() => setExito(''), 3000)
     } catch (err) {
+      console.error('Error completo:', err)
       setError('Error al subir foto: ' + err.message)
     } finally {
       setSubiendoFoto(false)

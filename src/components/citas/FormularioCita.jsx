@@ -71,7 +71,6 @@ export default function FormularioCita({ citaInicial, onGuardar, onCancelar }) {
       if (fecha && hora) {
         buscarOdontologosDisponibles(fecha, hora)
       } else {
-        // Limpiar si falta fecha u hora
         setOdontologosDisponibles([])
         setSinOdontologos(false)
         setForm(prev => ({ ...prev, [name]: value, odontologo_id: '' }))
@@ -92,7 +91,6 @@ export default function FormularioCita({ citaInicial, onGuardar, onCancelar }) {
       return
     }
 
-    // Doble verificación de disponibilidad al guardar
     const { disponible } = await verificarDisponibilidad(
       form.odontologo_id,
       form.fecha,
@@ -139,47 +137,51 @@ export default function FormularioCita({ citaInicial, onGuardar, onCancelar }) {
         </div>
       )}
 
-      {/* Paciente */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Paciente <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          value={busquedaPaciente}
-          onChange={handleBusquedaPaciente}
-          placeholder="🔍 Buscar paciente por nombre o DNI..."
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-        />
-        {busquedaPaciente.trim() !== '' && (
-          <div className="border border-gray-200 rounded-lg mt-1 max-h-40 overflow-y-auto shadow-sm bg-white">
-            {pacientes.length === 0 ? (
-              <p className="text-sm text-gray-400 px-3 py-2">No se encontraron pacientes</p>
-            ) : (
-              pacientes.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => {
-                    setForm({ ...form, paciente_id: p.id })
-                    setBusquedaPaciente(`${p.apellido}, ${p.nombre} — DNI: ${p.dni}`)
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 border-b border-gray-100 last:border-0"
-                >
-                  <span className="font-medium text-gray-800">{p.apellido}, {p.nombre}</span>
-                  <span className="text-gray-400 ml-2">DNI: {p.dni}</span>
-                </button>
-              ))
-            )}
-          </div>
-        )}
-        {form.paciente_id && busquedaPaciente.trim() !== '' && (
-          <p className="text-xs text-green-600 mt-1 font-medium">✅ Paciente seleccionado</p>
-        )}
-        <input type="hidden" name="paciente_id" value={form.paciente_id} required />
-      </div>
+      {/* Paciente — solo mostrar si es nueva cita, no al reprogramar */}
+      {!citaInicial ? (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Paciente <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={busquedaPaciente}
+            onChange={handleBusquedaPaciente}
+            placeholder="🔍 Buscar paciente por nombre o DNI..."
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+          />
+          {busquedaPaciente.trim() !== '' && (
+            <div className="border border-gray-200 rounded-lg mt-1 max-h-40 overflow-y-auto shadow-sm bg-white">
+              {pacientes.length === 0 ? (
+                <p className="text-sm text-gray-400 px-3 py-2">No se encontraron pacientes</p>
+              ) : (
+                pacientes.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      setForm({ ...form, paciente_id: p.id })
+                      setBusquedaPaciente(`${p.apellido}, ${p.nombre} — DNI: ${p.dni}`)
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 border-b border-gray-100 last:border-0"
+                  >
+                    <span className="font-medium text-gray-800">{p.apellido}, {p.nombre}</span>
+                    <span className="text-gray-400 ml-2">DNI: {p.dni}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+          {form.paciente_id && busquedaPaciente.trim() !== '' && (
+            <p className="text-xs text-green-600 mt-1 font-medium">✅ Paciente seleccionado</p>
+          )}
+        </div>
+      ) : (
+        /* Si es reprogramación, mantenemos el ID oculto sin mostrar el buscador */
+        <input type="hidden" name="paciente_id" value={form.paciente_id} />
+      )}
 
-      {/* Fecha y Hora — primero */}
+      {/* Fecha y Hora */}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">

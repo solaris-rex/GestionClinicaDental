@@ -89,8 +89,8 @@ export default function GestionCitas() {
     const resultado = await reprogramarCita(
       citaSeleccionada.id,
       form.fecha,
-      form.hora + ':00'
-    )
+      form.hora
+    ) 
     if (!resultado.error) {
       await cargarCitas()
       setVista('lista')
@@ -160,9 +160,13 @@ export default function GestionCitas() {
 
         {vista === 'reprogramar' && citaSeleccionada && (
           <div className="bg-white rounded-2xl shadow p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Reprogramar — {citaSeleccionada.paciente?.nombre} {citaSeleccionada.paciente?.apellido}
+            <h3 className="text-lg font-semibold text-gray-800 mb-1">
+              Reprogramar cita
             </h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Paciente: <strong>{citaSeleccionada.paciente?.apellido}, {citaSeleccionada.paciente?.nombre}</strong> — 
+              DNI: {citaSeleccionada.paciente?.dni}
+            </p>
             <FormularioCita
               citaInicial={{
                 paciente_id: citaSeleccionada.paciente_id,

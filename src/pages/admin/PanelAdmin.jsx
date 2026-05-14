@@ -72,32 +72,55 @@ export default function PanelAdmin() {
     setGuardando(true)
 
     try {
-      const { data: sesionActual } = await supabase.auth.getSession()
-      const tokenActual = sesionActual?.session?.access_token
-      const refreshActual = sesionActual?.session?.refresh_token
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
 
-      const { data, error: authError } = await supabase.auth.signUp({ email: form.email, password: form.password })
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
 
-      if (authError) {
-        if (tokenActual && refreshActual) await supabase.auth.setSession({ access_token: tokenActual, refresh_token: refreshActual })
-        setErrorForm(authError.message)
-        setGuardando(false)
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            email: form.email,
+            password: form.password,
+            nombre: form.nombre,
+            apellido: form.apellido,
+            telefono: form.telefono,
+            rol: form.rol,
+          }),
+          signal: controller.signal,
+        }
+      )
+
+      clearTimeout(timeoutId)
+      const data = await res.json()
+
+      if (!res.ok || data.error) {
+        setErrorForm(data.error || 'Error al crear usuario')
         return
       }
-
-      const userId = data?.user?.id
-      await conReintentos(() => supabase.from('perfiles').insert({
-        id: userId, nombre: form.nombre, apellido: form.apellido, telefono: form.telefono, rol: form.rol,
-      }))
-
-      if (tokenActual && refreshActual) await supabase.auth.setSession({ access_token: tokenActual, refresh_token: refreshActual })
 
       setExito('✅ Usuario creado correctamente')
       setForm({ nombre: '', apellido: '', telefono: '', email: '', password: '', rol: 'recepcionista' })
       setVista('lista')
-      cargarUsuarios()
-    } catch { setErrorForm('Error inesperado') }
-    finally { setGuardando(false) }
+      setTimeout(() => cargarUsuarios(), 500)
+
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        setErrorForm('La operación tardó demasiado. Intenta de nuevo.')
+      } else {
+        setErrorForm('Error inesperado: ' + err.message)
+      }
+    } finally {
+      setGuardando(false)
+    }
   }
 
   const coloresPorRol = {
