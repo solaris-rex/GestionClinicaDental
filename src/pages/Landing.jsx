@@ -245,8 +245,8 @@ export default function Landing() {
 
         <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
-            { icono: '📍', titulo: 'Dirección', info: 'Av. Principal 123, Ayacucho, Perú' },
-            { icono: '📞', titulo: 'Teléfono', info: '+51 966 123 456' },
+            { icono: '📍', titulo: 'Dirección', info: 'Jr. Lima 295, Ayacucho, Perú' },
+            { icono: '📞', titulo: 'Teléfono', info: '+51 941 812 369' },
             { icono: '🕐', titulo: 'Horario', info: 'Lun - Sáb: 8:00am - 6:00pm' },
           ].map((item) => (
             <div key={item.titulo} className="text-center p-6 bg-teal-50 rounded-2xl">
@@ -299,9 +299,9 @@ export default function Landing() {
           <div>
             <h4 className="text-white font-semibold mb-4">Información</h4>
             <ul className="space-y-2 text-sm">
-              <li>📍 Av. Principal 123, Ayacucho</li>
-              <li>📞 +51 966 123 456</li>
-              <li>✉️ contacto@dentanovax.com</li>
+              <li>📍 Jr. Lima 295, Ayacucho</li>
+              <li>📞 +51 941 812 369</li>
+              <li>✉️ Modesta@gmail.com</li>
               <li>🕐 Lun - Sáb: 8:00am - 6:00pm</li>
             </ul>
           </div>
